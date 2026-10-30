@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>No Q · Team tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F1FB; --surface:#FFFFFF; --surface-2:#EFE7F8; --ink:#1A0B33; --muted:#5E5478; --line:#E2D7F0;
+  --brand:#4A0C8B; --brand-ink:#FFFFFF; --band:#1A0B33; --band-ink:#F6F1FB; --band-muted:#C9BBE3;
+  --accent:#FF7A00; --accent-ink:#1A0B33;
+  --todo:#8C80A6; --doing:#4A0C8B; --wait:#E56F00; --wait-ink:#9A4700; --done:#1F8A57; --late:#C42B2B;
+  --todo-bg:#EEEAF4; --doing-bg:#EADFF7; --wait-bg:#FFEBD9; --done-bg:#DDF2E7;
+  --shadow:0 1px 2px rgba(26,11,51,.06), 0 8px 24px rgba(26,11,51,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120822; --surface:#1C1033; --surface-2:#261645; --ink:#F3EDFB; --muted:#B6A9D0; --line:#34234F;
+    --brand:#B48AF0; --brand-ink:#120822; --band:#0C0518; --band-ink:#F3EDFB; --band-muted:#B6A9D0;
+    --accent:#FF8A1F; --accent-ink:#120822;
+    --todo:#9A8FB5; --doing:#B48AF0; --wait:#FF9A3D; --wait-ink:#FFB46E; --done:#3FC08A; --late:#FF6B6B;
+    --todo-bg:#2A2140; --doing-bg:#2F1C52; --wait-bg:#3A2412; --done-bg:#12301F;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120822; --surface:#1C1033; --surface-2:#261645; --ink:#F3EDFB; --muted:#B6A9D0; --line:#34234F;
+  --brand:#B48AF0; --brand-ink:#120822; --band:#0C0518; --band-ink:#F3EDFB; --band-muted:#B6A9D0;
+  --accent:#FF8A1F; --accent-ink:#120822;
+  --todo:#9A8FB5; --doing:#B48AF0; --wait:#FF9A3D; --wait-ink:#FFB46E; --done:#3FC08A; --late:#FF6B6B;
+  --todo-bg:#2A2140; --doing-bg:#2F1C52; --wait-bg:#3A2412; --done-bg:#12301F;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+.h{font-family:'Montserrat','DM Sans',Arial,sans-serif}
+
+/* top band */
+.band{background:var(--band);color:var(--band-ink)}
+.band-in{max-width:1320px;margin:0 auto;padding:18px 24px 0;display:flex;flex-direction:column;gap:18px}
+.brandrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mark{width:40px;height:40px;border-radius:12px;background:#4A0C8B;border:3px solid #FF7A00;display:grid;place-items:center;font-family:'Montserrat',Arial,sans-serif;font-weight:800;font-size:15px;color:#fff;letter-spacing:-.5px;flex:none}
+.brandname{font-family:'Montserrat',Arial,sans-serif;font-weight:700;font-size:17px}
+.brandname span{color:var(--band-muted);font-weight:600}
+.spacer{flex:1}
+.btn{border:0;border-radius:10px;padding:9px 16px;font-weight:600;display:inline-flex;align-items:center;gap:8px;min-height:40px}
+.btn-accent{background:var(--accent);color:var(--accent-ink)}
+.btn-accent:hover{filter:brightness(1.05)}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.band .btn-ghost{border-color:rgba(255,255,255,.22);color:var(--band-ink)}
+.btn-ghost:hover{background:var(--surface-2)}
+.band .btn-ghost:hover{background:rgba(255,255,255,.08)}
+.btn-danger{background:transparent;border:1px solid var(--late);color:var(--late)}
+
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:28px;align-items:end;padding:6px 0 22px}
+.hero h1{font-family:'Montserrat',Arial,sans-serif;font-weight:800;font-size:clamp(28px,4vw,44px);line-height:1.05;letter-spacing:-1px;margin:0}
+.hero p{margin:8px 0 0;color:var(--band-muted);max-width:52ch}
+.flow{display:flex;flex-direction:column;gap:10px}
+.flowbar{display:flex;height:16px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);gap:3px}
+.flowbar div{min-width:6px;transition:flex-grow .3s}
+.legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.lg{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px;text-align:left;color:var(--band-ink)}
+.lg:hover{background:rgba(255,255,255,.1)}
+.lg[aria-pressed="true"]{border-color:#FF7A00;background:rgba(255,122,0,.12)}
+.lg b{display:block;font-family:'Montserrat',Arial,sans-serif;font-size:26px;font-weight:800;line-height:1.1}
+.lg span{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--band-muted)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+
+.tabs{display:flex;gap:4px}
+.tab{background:transparent;border:0;color:var(--band-muted);padding:12px 16px 14px;font-weight:600;border-bottom:3px solid transparent;border-radius:0}
+.tab[aria-selected="true"]{color:var(--band-ink);border-bottom-color:#FF7A00}
+.tab:hover{color:var(--band-ink)}
+
+/* filters */
+.filters{max-width:1320px;margin:0 auto;padding:18px 24px 6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px 5px 6px;display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14px;min-height:36px}
+.chip.plain{padding:5px 14px}
+.chip[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;background:var(--surface-2);color:var(--ink);flex:none;letter-spacing:.2px}
+.chip[aria-pressed="true"] .av{background:rgba(255,255,255,.22);color:inherit}
+.sel,.search{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;min-height:38px}
+.search{min-width:220px}
+.flabel{font-size:13px;color:var(--muted);font-weight:600}
+
+main{max-width:1320px;margin:0 auto;padding:10px 24px 64px}
+.notice{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:28px;color:var(--muted);text-align:center}
+.notice b{color:var(--ink)}
+
+/* today */
+.today{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:22px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.panel-h{display:flex;align-items:baseline;gap:10px;padding:16px 18px 10px}
+.panel-h h2{font-family:'Montserrat',Arial,sans-serif;font-size:17px;font-weight:700;margin:0}
+.panel-h .count{color:var(--muted);font-size:14px}
+.panel-h .hint{margin-left:auto;color:var(--muted);font-size:13px}
+.rows{display:flex;flex-direction:column}
+.trow{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 18px 12px 0;border-top:1px solid var(--line);background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.trow:hover{background:var(--surface-2)}
+.trow .stripe{align-self:stretch;border-radius:0 3px 3px 0}
+.trow .t{font-weight:600}
+.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:13px;margin-top:3px}
+.proj{font-weight:600;color:var(--ink)}
+.note{color:var(--muted);font-size:13px;margin-top:3px}
+.avs{display:flex}
+.avs .av{border:2px solid var(--surface);margin-left:-4px}
+.avs .av:first-child{margin-left:0}
+.empty{padding:16px 18px 20px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+.stack{display:flex;flex-direction:column;gap:22px}
+
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.pill.todo{background:var(--todo-bg);color:var(--ink)}
+.pill.doing{background:var(--doing-bg);color:var(--ink)}
+.pill.wait{background:var(--wait-bg);color:var(--ink)}
+.pill.done{background:var(--done-bg);color:var(--ink)}
+.due{font-weight:600;color:var(--muted)}
+.due.soon{color:var(--wait-ink)}
+.due.late{color:var(--late)}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(4,minmax(260px,1fr));gap:16px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--surface-2);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:200px;border:2px solid transparent}
+.col.drop{border-color:var(--accent)}
+.col-h{display:flex;align-items:center;gap:8px;padding:4px 4px 6px}
+.col-h h2{font-family:'Montserrat',Arial,sans-serif;font-size:15px;font-weight:700;margin:0}
+.col-h .count{color:var(--muted);font-size:14px;margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 12px 10px;text-align:left;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);width:100%}
+.card:hover{border-color:var(--brand)}
+.card[draggable="true"]{cursor:grab}
+.card .t{font-weight:600;line-height:1.35}
+.card .foot{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.tag{font-size:12px;font-weight:600;color:var(--muted)}
+.days{display:flex;gap:3px}
+.dd{width:18px;height:18px;border-radius:5px;font-size:10px;font-weight:700;display:grid;place-items:center;background:var(--surface-2);color:var(--muted)}
+.dd.on{background:var(--accent);color:var(--accent-ink)}
+.dd.is-today{box-shadow:inset 0 0 0 2px var(--brand)}
+
+/* list */
+.groups{display:flex;flex-direction:column;gap:22px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th{font-size:12.5px;color:var(--muted);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:14px}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--surface-2)}
+td.tt{font-weight:600;min-width:220px}
+td .linkbtn{background:none;border:0;padding:0;text-align:left;font-weight:600}
+td .linkbtn:hover{text-decoration:underline}
+.daytog{display:flex;gap:3px}
+.daytog button{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--surface);font-size:11px;font-weight:700;color:var(--muted);padding:0;display:grid;place-items:center;line-height:1}
+#fDays button{width:40px;height:36px;font-size:13px}
+.daytog button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.daytog button.is-today{box-shadow:inset 0 0 0 2px var(--brand)}
+.ssel{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;background:var(--surface)}
+
+/* dialog */
+dialog{border:0;border-radius:18px;padding:0;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 40px);background:var(--surface);color:var(--ink);box-shadow:0 24px 80px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(18,8,34,.55)}
+.dlg{display:flex;flex-direction:column;max-height:calc(100vh - 40px)}
+.dlg-h{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.dlg-h h2{font-family:'Montserrat',Arial,sans-serif;font-size:19px;margin:0}
+.dlg-b{padding:18px 22px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.dlg-f{display:flex;gap:10px;padding:14px 22px;border-top:1px solid var(--line);align-items:center}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+.field label,.field .lbl{font-size:13px;font-weight:700;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 12px;min-height:40px}
+.field textarea{min-height:76px;resize:vertical}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 6px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button[aria-pressed="true"]{border-color:var(--ink);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--ink)}
+.owners{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.owners .chip{padding:4px 12px 4px 5px}
+.owners input{width:110px;border:1px dashed var(--line);border-radius:999px;padding:6px 12px;background:transparent;min-height:36px;text-transform:uppercase}
+.log{display:flex;flex-direction:column;gap:10px}
+.logitem{border-left:3px solid var(--line);padding:2px 0 2px 12px}
+.logitem .when{font-size:12.5px;color:var(--muted)}
+.logadd{display:flex;gap:8px}
+.logadd input{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 12px;min-height:40px}
+.iconbtn{background:transparent;border:0;border-radius:8px;width:36px;height:36px;display:grid;place-items:center;color:var(--muted)}
+.iconbtn:hover{background:var(--surface-2);color:var(--ink)}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1}
+.ro{display:none;font-size:13px;color:var(--band-muted)}
+body.readonly .ro{display:inline}
+body.readonly .needs-write{display:none !important}
+.gate{position:fixed;inset:0;background:var(--band);display:grid;place-items:center;z-index:60;padding:24px}
+.gate[hidden]{display:none}
+.gate-card{background:var(--surface);color:var(--ink);border-radius:18px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px}
+.gate-card h2{margin:4px 0 0;font-size:20px}
+.gate-card p{margin:0;color:var(--muted)}
+.gate-card input{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;min-height:44px}
+.sync{font-size:13px;color:var(--band-muted)}
+#logBy{min-width:86px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+@media (max-width: 900px){
+  .hero{grid-template-columns:1fr}
+  .today{grid-template-columns:1fr}
+  .dlg-b{grid-template-columns:1fr}
+  .legend{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .search,.sel{flex:1 1 100%;min-width:0}
+  .filters .spacer{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="band">
+  <div class="band-in">
+    <div class="brandrow">
+      <div class="mark" aria-hidden="true">NoQ</div>
+      <div class="brandname">No Q <span>Team tracker</span></div>
+      <div class="spacer"></div>
+      <span class="sync" id="sync" aria-live="polite"></span>
+      <button class="btn btn-ghost needs-write" id="teamBtn" type="button">Team</button>
+      <button class="btn btn-accent needs-write" id="addBtn" type="button">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Add task
+      </button>
+    </div>
+    <div class="hero">
+      <div>
+        <h1 id="dayTitle">Today</h1>
+        <p id="daySummary">Loading the team’s tasks…</p>
+      </div>
+      <div class="flow">
+        <div class="flowbar" id="flowbar" aria-hidden="true"></div>
+        <div class="legend" id="legend" role="group" aria-label="Filter by status"></div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" data-view="today" aria-selected="true" type="button">Today</button>
+      <button class="tab" role="tab" data-view="board" aria-selected="false" type="button">Board</button>
+      <button class="tab" role="tab" data-view="list" aria-selected="false" type="button">All tasks</button>
+    </div>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="flabel">Who</span>
+  <div class="chips" id="people" role="group" aria-label="Filter by person"></div>
+  <div class="spacer"></div>
+  <select class="sel" id="wsFilter" aria-label="Filter by workstream"></select>
+  <input class="search" id="search" type="search" placeholder="Search tasks, projects, notes" aria-label="Search">
+</div>
+
+<main id="main"></main>
+
+<dialog id="taskDlg" aria-labelledby="dlgTitle">
+  <form class="dlg" method="dialog" id="taskForm">
+    <div class="dlg-h">
+      <h2 id="dlgTitle">Task</h2>
+      <div class="spacer"></div>
+      <button class="iconbtn" type="button" id="dlgClose" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="dlg-b">
+      <div class="field full"><label for="fTitle">Task</label><input id="fTitle" required placeholder="What needs doing?"></div>
+      <div class="field"><label for="fProject">Project</label><input id="fProject" placeholder="e.g. NYDA Application"></div>
+      <div class="field"><label for="fCode">Project number</label><input id="fCode" placeholder="e.g. 2604"></div>
+      <div class="field"><label for="fWs">Workstream</label><select id="fWs"></select></div>
+      <div class="field"><label for="fDue">Due or follow-up date</label><input id="fDue" type="date"></div>
+      <div class="field full"><span class="lbl" id="stLbl">Status</span><div class="seg" id="fStatus" role="group" aria-labelledby="stLbl"></div></div>
+      <div class="field full"><span class="lbl" id="ownLbl">Who’s responsible</span><div class="owners" id="fOwners" role="group" aria-labelledby="ownLbl"></div></div>
+      <div class="field full"><span class="lbl" id="dayLbl">Working on it this week</span><div class="daytog" id="fDays" role="group" aria-labelledby="dayLbl"></div></div>
+      <div class="field full"><label for="fNote">Latest status or next step</label><textarea id="fNote" placeholder="e.g. Awaiting response, follow up on Monday"></textarea></div>
+      <div class="field full" id="logField"><span class="lbl">Updates</span>
+        <div class="logadd needs-write"><select id="logBy" class="sel" aria-label="Posting as"></select><input id="logInput" placeholder="Add an update, e.g. Called Mphiliseni, meeting set for Tuesday" aria-label="New update"><button class="btn btn-ghost" type="button" id="logAdd">Post update</button></div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+    <div class="dlg-f">
+      <button class="btn btn-danger needs-write" type="button" id="delBtn">Delete task</button>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Cancel</button>
+      <button class="btn btn-accent needs-write" type="submit" id="saveBtn">Save task</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="teamDlg" aria-labelledby="teamTitle">
+  <form class="dlg" method="dialog" id="teamForm">
+    <div class="dlg-h"><h2 id="teamTitle">Team</h2><div class="spacer"></div>
+      <button class="iconbtn" type="button" id="teamClose" aria-label="Close"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="dlg-b" id="teamBody" style="grid-template-columns:1fr"></div>
+    <div class="dlg-f"><div class="spacer"></div><button class="btn btn-ghost" type="button" id="teamCancel">Cancel</button><button class="btn btn-accent" type="submit">Save team</button></div>
+  </form>
+</dialog>
+
+<div class="gate" id="gate" hidden>
+  <form class="gate-card" id="gateForm">
+    <div class="mark" aria-hidden="true">NoQ</div>
+    <h2 class="h">Team passcode</h2>
+    <p>Enter the passcode your team shared with you. You’ll only need to do this once on this device.</p>
+    <input id="gateInput" type="password" autocomplete="current-password" aria-label="Passcode" required>
+    <button class="btn btn-accent" type="submit">Open tracker</button>
+    <p id="gateErr" role="alert"></p>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ======================================================================
+   PASTE YOUR GOOGLE WEB APP LINK BETWEEN THE QUOTES BELOW.
+   It's the "Web app URL" from Apps Script > Deploy > Manage deployments,
+   and it ends in /exec
+   ====================================================================== */
+const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0IfoZpSapPXI-OvsPp5k0Zg5g-VGTSegnPso0AJ9KktKum/exec";
+
+(function(){
+  const STATUSES = [
+    {id:"todo",  label:"To do",       color:"var(--todo)"},
+    {id:"doing", label:"In progress", color:"var(--doing)"},
+    {id:"wait",  label:"Waiting on others", short:"Waiting", color:"var(--wait)"},
+    {id:"done",  label:"Done",        color:"var(--done)"}
+  ];
+  const ST = Object.fromEntries(STATUSES.map(s=>[s.id,s]));
+  const WORKSTREAMS = ["Funding","Admin","Finance","Contracts & onboarding","Business activation","Marketing","Other"];
+  const DAYS = [["mon","M","Monday"],["tue","T","Tuesday"],["wed","W","Wednesday"],["thu","T","Thursday"],["fri","F","Friday"],["sat","S","Saturday"]];
+
+  const state = {
+    tasks: [], team: null, view: "today", person: "all", ws: "all", status: null, q: "",
+    canWrite: true, loaded: false, failed: false, editing: null, draft: null, code: ""
+  };
+  const $ = s => document.querySelector(s);
+  const el = (tag, attrs, ...kids) => {
+    const n = document.createElement(tag);
+    if (attrs) for (const [k,v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else if (k === "style") n.setAttribute("style", v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+    return n;
+  };
+
+  // ---------- dates ----------
+  const now = () => new Date();
+  function iso(d){ const z = new Date(d.getTime() - d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+  function mondayOf(d){ const x = new Date(d); const wd = (x.getDay()+6)%7; x.setDate(x.getDate()-wd); x.setHours(0,0,0,0); return iso(x); }
+  const thisWeek = () => mondayOf(now());
+  function todayKey(){ const i = (now().getDay()+6)%7; return i < 6 ? DAYS[i][0] : null; }
+  function parseISO(s){ if(!s) return null; const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
+  function daysUntil(s){ const d = parseISO(s); if(!d) return null; const t = new Date(); t.setHours(0,0,0,0); return Math.round((d - t)/86400000); }
+  function fmtDue(s){
+    const n = daysUntil(s); if (n == null) return null;
+    const d = parseISO(s);
+    const label = d.toLocaleDateString("en-ZA",{weekday:"short", day:"numeric", month:"short"});
+    if (n < 0) return {text: `Overdue · ${label}`, cls:"late"};
+    if (n === 0) return {text: "Due today", cls:"late"};
+    if (n === 1) return {text: "Due tomorrow", cls:"soon"};
+    if (n <= 7) return {text: `Due ${label}`, cls:"soon"};
+    return {text: `Due ${label}`, cls:""};
+  }
+  function ago(isoStr){
+    if(!isoStr) return "";
+    const s = (Date.now() - new Date(isoStr).getTime())/1000;
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s/60)} min ago`;
+    if (s < 86400) return `${Math.floor(s/3600)} h ago`;
+    const d = Math.floor(s/86400);
+    if (d < 7) return d === 1 ? "yesterday" : `${d} days ago`;
+    return new Date(isoStr).toLocaleDateString("en-ZA",{day:"numeric", month:"short"});
+  }
+  const planned = t => (t.weekOf === thisWeek() && Array.isArray(t.days)) ? t.days : [];
+
+  // ---------- people ----------
+  function teamList(){
+    const set = new Map();
+    (state.team?.people || []).forEach(p => p && p.id && set.set(p.id, p.name || ""));
+    state.tasks.forEach(t => (t.owners||[]).forEach(o => { if(o && !set.has(o)) set.set(o, ""); }));
+    return [...set.entries()].map(([id,name]) => ({id, name}));
+  }
+  const nameOf = id => (teamList().find(p=>p.id===id)?.name) || id;
+  function avatar(id){ return el("span",{class:"av", title:nameOf(id), "aria-label":nameOf(id), text:id}); }
+  function avatars(list){ const w = el("span",{class:"avs"}); (list||[]).forEach(o=>w.append(avatar(o))); if(!(list||[]).length) w.append(el("span",{class:"tag",text:"Unassigned"})); return w; }
+
+  // ---------- filtering ----------
+  function matches(t, ignoreStatus){
+    if (state.person !== "all") {
+      if (state.person === "none" ? (t.owners||[]).length : !(t.owners||[]).includes(state.person)) return false;
+    }
+    if (state.ws !== "all" && (t.workstream||"Other") !== state.ws) return false;
+    if (!ignoreStatus && state.status && t.status !== state.status) return false;
+    if (state.q) {
+      const hay = [t.title,t.project,t.code,t.note,(t.owners||[]).join(" ")].join(" ").toLowerCase();
+      if (!hay.includes(state.q.toLowerCase())) return false;
+    }
+    return true;
+  }
+  const sortTasks = arr => arr.slice().sort((a,b)=>{
+    const da = a.due || "9999", db = b.due || "9999";
+    if (da !== db) return da < db ? -1 : 1;
+    return (a.order ?? 999) - (b.order ?? 999);
+  });
+
+  // ---------- header ----------
+  function renderHeader(){
+    const d = now();
+    $("#dayTitle").textContent = d.toLocaleDateString("en-ZA",{weekday:"long", day:"numeric", month:"long"});
+    const scoped = state.tasks.filter(t=>matches(t,true));
+    const c = Object.fromEntries(STATUSES.map(s=>[s.id, scoped.filter(t=>t.status===s.id).length]));
+    const tk = todayKey();
+    const todayN = tk ? scoped.filter(t=>t.status!=="done" && planned(t).includes(tk)).length : 0;
+    const dueN = scoped.filter(t=>t.status!=="done" && t.due && daysUntil(t.due) <= 7).length;
+    const who = state.person === "all" ? "The team has" : state.person === "none" ? "Unassigned:" : `${nameOf(state.person)} has`;
+    if (!state.loaded) { $("#daySummary").textContent = state.failed ? "Tasks couldn’t load." : "Loading the team’s tasks…"; }
+    else $("#daySummary").textContent =
+      `${who} ${c.doing} in progress and ${c.wait} waiting on others. ${todayN} planned for today, ${dueN} due within a week.`;
+
+    const total = scoped.length || 1;
+    const fb = $("#flowbar"); fb.replaceChildren();
+    STATUSES.forEach(s => { if (c[s.id]) fb.append(el("div",{style:`flex-grow:${c[s.id]/total};background:${s.color}`})); });
+    const lg = $("#legend"); lg.replaceChildren();
+    STATUSES.forEach(s => lg.append(el("button",{class:"lg", type:"button", "aria-pressed": String(state.status===s.id),
+      onclick:()=>{ state.status = state.status===s.id ? null : s.id; render(); }},
+      el("b",{text:c[s.id]}), el("span",{}, el("i",{class:"dot", style:`background:${s.color}`}), s.short||s.label))));
+  }
+
+  function renderFilters(){
+    const box = $("#people"); box.replaceChildren();
+    const mk = (id,label,withAv) => el("button",{class:"chip"+(withAv?"":" plain"), type:"button", "aria-pressed":String(state.person===id),
+      onclick:()=>{ state.person=id; try{localStorage.setItem("noq.person",id)}catch(e){} render(); }},
+      withAv ? avatar(id) : null, label);
+    box.append(mk("all","Everyone",false));
+    teamList().forEach(p => box.append(p.name ? mk(p.id, p.name.split(" ")[0], true) : mk(p.id, p.id, false)));
+    if (state.tasks.some(t=>!(t.owners||[]).length)) box.append(mk("none","Unassigned",false));
+    const ws = $("#wsFilter");
+    if (!ws.options.length) {
+      ws.append(el("option",{value:"all",text:"All workstreams"}));
+      WORKSTREAMS.forEach(w=>ws.append(el("option",{value:w,text:w})));
+    }
+    ws.value = state.ws;
+  }
+
+  // ---------- pieces ----------
+  function statusPill(s){ const x = ST[s]||ST.todo; return el("span",{class:"pill "+x.id}, el("i",{class:"dot",style:`background:${x.color}`}), x.short||x.label); }
+  function dueTag(t){ if (t.status==="done") return null; const f = fmtDue(t.due); return f ? el("span",{class:"due "+f.cls, text:f.text}) : null; }
+  function dayDots(t){
+    const p = planned(t), tk = todayKey();
+    const w = el("span",{class:"days", "aria-label": p.length ? "Planned: "+p.map(k=>DAYS.find(d=>d[0]===k)[2]).join(", ") : "Not planned this week"});
+    DAYS.forEach(([k,l]) => w.append(el("span",{class:"dd"+(p.includes(k)?" on":"")+(k===tk?" is-today":""), "aria-hidden":"true", text:l})));
+    return w;
+  }
+  function taskRow(t, extra){
+    return el("button",{class:"trow", type:"button", onclick:()=>openTask(t.id)},
+      el("span",{class:"stripe", style:`background:${(ST[t.status]||ST.todo).color}`}),
+      el("span",{},
+        el("div",{class:"t", text:t.title}),
+        el("div",{class:"meta"}, t.project ? el("span",{class:"proj", text:(t.code? t.code+" · ":"")+t.project}) : null, statusPill(t.status), dueTag(t), extra||null),
+        t.note ? el("div",{class:"note", text:t.note}) : null),
+      avatars(t.owners));
+  }
+  function panel(title, items, emptyText, hint){
+    const p = el("section",{class:"panel"},
+      el("div",{class:"panel-h"}, el("h2",{text:title}), el("span",{class:"count", text:items.length}), hint ? el("span",{class:"hint", text:hint}) : null));
+    if (!items.length) p.append(el("div",{class:"empty", text:emptyText}));
+    else p.append(el("div",{class:"rows"}, items));
+    return p;
+  }
+
+  // ---------- views ----------
+  function renderToday(){
+    const tk = todayKey();
+    const open = state.tasks.filter(t=>t.status!=="done" && matches(t));
+    const todayTasks = tk ? sortTasks(open.filter(t=>planned(t).includes(tk))) : [];
+    const dueSoon = sortTasks(open.filter(t=>t.due && daysUntil(t.due) <= 7));
+    const waiting = sortTasks(open.filter(t=>t.status==="wait"));
+    const doing = sortTasks(open.filter(t=>t.status==="doing" && !(tk && planned(t).includes(tk))));
+    const dayName = tk ? DAYS.find(d=>d[0]===tk)[2] : null;
+    return el("div",{class:"today"},
+      el("div",{class:"stack"},
+        panel(tk ? `Planned for ${dayName}` : "Planned for today", todayTasks.map(t=>taskRow(t)),
+          tk ? "Nothing planned for today yet. Open a task and tick today under “Working on it this week”." : "Sunday: no working day is planned.",
+          tk ? "From the weekly plan" : null),
+        panel("Also in progress", doing.map(t=>taskRow(t)), "Nothing else in progress.")),
+      el("div",{class:"stack"},
+        panel("Due within a week", dueSoon.map(t=>taskRow(t)), "No deadlines or follow-ups in the next 7 days."),
+        panel("Waiting on others", waiting.map(t=>taskRow(t)), "Nobody is being waited on.", "Follow up")));
+  }
+
+  let dragId = null;
+  function renderBoard(){
+    const b = el("div",{class:"board"});
+    STATUSES.forEach(s => {
+      const items = sortTasks(state.tasks.filter(t=>t.status===s.id && matches(t, true)));
+      if (state.status && state.status !== s.id) return;
+      const col = el("section",{class:"col", "aria-label":s.label});
+      col.append(el("div",{class:"col-h"}, el("i",{class:"dot",style:`background:${s.color}`}), el("h2",{text:s.label}), el("span",{class:"count",text:items.length})));
+      items.forEach(t => {
+        const c = el("div",{class:"card", role:"button", tabindex:"0", draggable: state.canWrite ? "true" : null, onclick:()=>openTask(t.id),
+          onkeydown:e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openTask(t.id); } },
+          ondragstart:e=>{ dragId=t.id; e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",t.id)}catch(_){} } },
+          el("span",{class:"tag", text:[t.code,t.project].filter(Boolean).join(" · ") || t.workstream || ""}),
+          el("span",{class:"t", text:t.title}),
+          t.note ? el("span",{class:"note", text:t.note}) : null,
+          el("span",{class:"foot"}, avatars(t.owners), dueTag(t) || (t.status!=="done" && planned(t).length ? dayDots(t) : null)));
+        col.append(c);
+      });
+      if (!items.length) col.append(el("div",{class:"tag", style:"padding:6px 4px", text: state.canWrite ? "Drag a task here" : "Empty"}));
+      if (state.canWrite) {
+        col.addEventListener("dragover", e=>{ e.preventDefault(); col.classList.add("drop"); });
+        col.addEventListener("dragleave", ()=>col.classList.remove("drop"));
+        col.addEventListener("drop", e=>{ e.preventDefault(); col.classList.remove("drop"); const id = dragId; dragId=null; if(id) setStatus(id, s.id); });
+      }
+      b.append(col);
+    });
+    return b;
+  }
+
+  function renderList(){
+    const wrap = el("div",{class:"groups"});
+    const tk = todayKey();
+    const wsList = WORKSTREAMS.filter(w => state.tasks.some(t=>(t.workstream||"Other")===w && matches(t)));
+    if (!wsList.length) return el("div",{class:"notice", text:"No tasks match these filters."});
+    wsList.forEach(w => {
+      const items = state.tasks.filter(t=>(t.workstream||"Other")===w && matches(t)).sort((a,b)=>(a.order??999)-(b.order??999));
+      const tb = el("tbody");
+      items.forEach(t => {
+        const dt = el("div",{class:"daytog", role:"group", "aria-label":"Days this week"});
+        const p = planned(t);
+        DAYS.forEach(([k,l,full]) => dt.append(el("button",{type:"button", class: k===tk?"is-today":null, "aria-pressed":String(p.includes(k)), "aria-label":full, title:full, text:l,
+          disabled: state.canWrite ? null : true, onclick:()=>toggleDay(t.id,k)})));
+        const sel = el("select",{class:"ssel", "aria-label":"Status", disabled: state.canWrite ? null : true, onchange:e=>setStatus(t.id, e.target.value)});
+        STATUSES.forEach(s=>sel.append(el("option",{value:s.id, text:s.short||s.label, selected: t.status===s.id ? true : null})));
+        sel.style.background = `var(--${t.status}-bg)`;
+        tb.append(el("tr",{},
+          el("td",{class:"tt"}, el("button",{class:"linkbtn", type:"button", onclick:()=>openTask(t.id), text:t.title})),
+          el("td",{}, el("span",{class:"proj", text:[t.code,t.project].filter(Boolean).join(" · ")})),
+          el("td",{}, avatars(t.owners)),
+          el("td",{}, sel),
+          el("td",{}, dt),
+          el("td",{}, dueTag(t) || el("span",{class:"tag", text:t.status==="done"?"":"—"})),
+          el("td",{class:"note", text:t.note||""})));
+      });
+      wrap.append(el("section",{class:"panel"},
+        el("div",{class:"panel-h"}, el("h2",{text:w}), el("span",{class:"count", text:items.length})),
+        el("div",{class:"tablewrap"}, el("table",{},
+          el("thead",{}, el("tr",{}, ["Task","Project","Who","Status","This week","Due","Latest status"].map(h=>el("th",{scope:"col",text:h})))), tb))));
+    });
+    return wrap;
+  }
+
+  function render(){
+    document.body.classList.toggle("readonly", !state.canWrite);
+    renderHeader(); renderFilters();
+    document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view===state.view)));
+    const m = $("#main"); m.replaceChildren();
+    if (state.failed && !API_READY) { m.append(el("div",{class:"notice"}, el("b",{text:"This page isn’t connected to your Google Sheet yet."}), el("br"), "Open index.html on GitHub, paste your web app link (ending in /exec) into API_URL near the top of the script, and commit the change.")); return; }
+    if (state.failed) { m.append(el("div",{class:"notice"}, el("b",{text:"The tracker couldn’t load."}), el("br"), "Check your internet connection, then reload the page. If it keeps happening, check that the web app link in index.html is the latest one.")); return; }
+    if (!state.loaded) { m.append(el("div",{class:"notice", text:"Loading tasks…"})); return; }
+    if (!state.tasks.length) { m.append(el("div",{class:"notice"}, el("b",{text:"No tasks yet."}), el("br"), state.canWrite ? "Use “Add task” to log the first activity." : "Tasks will appear here once the team adds them.")); return; }
+    m.append(state.view==="today" ? renderToday() : state.view==="board" ? renderBoard() : renderList());
+  }
+
+  // ---------- writes ----------
+  let toastT;
+  function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+  function writeFailed(e){
+    const m = String((e && e.message) || e || "");
+    if (m.includes("PASSCODE_REQUIRED")) { showGate("That passcode didn’t work. Ask the team for the current one."); return; }
+    if (m.includes("NOT_FOUND")) { toast("Someone else deleted this task."); refresh(); return; }
+    if (m.includes("BUSY")) { toast("Lots of changes at once. Try again in a moment."); return; }
+    toast("That change didn’t save. Check your connection and try again.");
+  }
+  // ---------- server (Google Apps Script) ----------
+  const API_READY = /^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL.trim());
+  async function api(fn, ...args){
+    if (!API_READY) throw new Error("NO_API_URL");
+    // Plain-text body keeps this a "simple" request (no CORS preflight), and no cookies are sent,
+    // so Google's multiple-account switching never gets involved.
+    const res = await fetch(API_URL.trim(), {
+      method: "POST", redirect: "follow", credentials: "omit",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: fn, code: state.code, args })
+    });
+    if (!res.ok) throw new Error("HTTP_" + res.status);
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || "SERVER_ERROR");
+    return out.data;
+  }
+  let lastSync = null;
+  function apply(st){
+    if (!st) return;
+    state.tasks = st.tasks || []; state.team = {people: st.team || []};
+    state.loaded = true; state.failed = false; lastSync = new Date();
+    if (dlg.open && state.editing) {
+      const t = state.tasks.find(x=>x.id===state.editing);
+      if (!t) { dlg.close(); toast("This task was deleted"); } else renderLog(t);
+    }
+    render(); showSync();
+  }
+  function showSync(){
+    const n = $("#sync"); if (!n) return;
+    n.textContent = lastSync ? "Synced " + lastSync.toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"}) : "";
+  }
+  let refreshing = false;
+  async function refresh(){
+    if (refreshing) return; refreshing = true;
+    try { apply(await api("getState")); }
+    catch(e){
+      const m = String((e && e.message) || e || "");
+      if (m.includes("PASSCODE_REQUIRED")) showGate(state.code ? "That passcode didn’t work. Ask the team for the current one." : "");
+      else if (!state.loaded) { state.failed = true; render(); }
+      else { const n=$("#sync"); if(n) n.textContent = "Offline, retrying"; }
+    } finally { refreshing = false; }
+  }
+  function showGate(msg){ $("#gate").hidden = false; $("#gateErr").textContent = msg || ""; setTimeout(()=>$("#gateInput").focus(),30); }
+  const busy = new Set();
+  async function patch(id, data, okMsg){
+    if (busy.has(id)) { toast("Still saving the last change…"); return; }
+    const t = state.tasks.find(x=>x.id===id); if (t) { Object.assign(t, data); render(); }
+    busy.add(id);
+    try { apply(await api("saveTask", id, data)); if (okMsg) toast(okMsg); }
+    catch(e){ writeFailed(e); refresh(); }
+    finally { busy.delete(id); }
+  }
+  function setStatus(id, s){ const t = state.tasks.find(x=>x.id===id); if (!t || t.status===s) return; patch(id,{status:s}, `Moved to ${ST[s].label}`); }
+  function toggleDay(id, k){
+    const t = state.tasks.find(x=>x.id===id); if(!t) return;
+    const p = new Set(planned(t)); p.has(k) ? p.delete(k) : p.add(k);
+    patch(id,{days: DAYS.map(d=>d[0]).filter(d=>p.has(d)), weekOf: thisWeek()});
+  }
+
+  // ---------- task dialog ----------
+  const dlg = $("#taskDlg");
+  function buildDialog(){
+    const fw = $("#fWs"); fw.replaceChildren(); WORKSTREAMS.forEach(w=>fw.append(el("option",{value:w,text:w})));
+  }
+  function renderDraft(){
+    const d = state.draft;
+    const seg = $("#fStatus"); seg.replaceChildren();
+    STATUSES.forEach(s=>seg.append(el("button",{type:"button","aria-pressed":String(d.status===s.id), onclick:()=>{ d.status=s.id; renderDraft(); }},
+      el("i",{class:"dot",style:`background:${s.color}`}), s.short||s.label)));
+    const ow = $("#fOwners"); ow.replaceChildren();
+    teamList().concat(d.owners.filter(o=>!teamList().some(p=>p.id===o)).map(id=>({id,name:""}))).forEach(p =>
+      ow.append(el("button",{class:"chip"+(p.name?"":" plain"), type:"button", "aria-pressed":String(d.owners.includes(p.id)),
+        onclick:()=>{ d.owners = d.owners.includes(p.id) ? d.owners.filter(x=>x!==p.id) : d.owners.concat(p.id); renderDraft(); }},
+        p.name ? avatar(p.id) : null, p.name || p.id)));
+    const add = el("input",{placeholder:"+ Add", "aria-label":"Add a person by initials", maxlength:"4",
+      onkeydown:e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,""); if(v && !d.owners.includes(v)){ d.owners=d.owners.concat(v); } renderDraft(); setTimeout(()=>$("#fOwners input")?.focus(),0); } }});
+    ow.append(add);
+    const fd = $("#fDays"); fd.replaceChildren(); const tk = todayKey();
+    DAYS.forEach(([k,l,full]) => fd.append(el("button",{type:"button", class:k===tk?"is-today":null, "aria-pressed":String(d.days.includes(k)), "aria-label":full, title:full, text:l,
+      onclick:()=>{ d.days = d.days.includes(k) ? d.days.filter(x=>x!==k) : DAYS.map(x=>x[0]).filter(x=>x===k || d.days.includes(x)); renderDraft(); }})));
+  }
+  async function renderLog(t){
+    const box = $("#log"); box.replaceChildren();
+    const ups = (t && Array.isArray(t.updates)) ? t.updates.slice().reverse() : [];
+    if (!t) { $("#logField").style.display="none"; return; }
+    $("#logField").style.display="";
+    if (!ups.length) { box.append(el("div",{class:"tag", text:"No updates yet."})); return; }
+    ups.forEach(u => box.append(el("div",{class:"logitem"},
+      el("div",{text:u.text}),
+      el("div",{class:"when", text:`${u.by ? nameOf(u.by) : "Someone"}, ${ago(u.at)}`}))));
+  }
+  function openTask(id){
+    const t = id ? state.tasks.find(x=>x.id===id) : null;
+    state.editing = t ? t.id : null;
+    state.draft = { status: t?.status || "todo", owners: (t?.owners || (state.person!=="all" && state.person!=="none" ? [state.person] : [])).slice(), days: t ? planned(t).slice() : [] };
+    $("#dlgTitle").textContent = t ? "Task" : "New task";
+    $("#fTitle").value = t?.title || ""; $("#fProject").value = t?.project || ""; $("#fCode").value = t?.code || "";
+    $("#fWs").value = t?.workstream || (state.ws!=="all" ? state.ws : "Funding");
+    $("#fDue").value = t?.due || ""; $("#fNote").value = t?.note || "";
+    $("#delBtn").style.display = t ? "" : "none";
+    $("#logInput").value = "";
+    ["fTitle","fProject","fCode","fWs","fDue","fNote"].forEach(i=>$("#"+i).disabled = !state.canWrite);
+    const lb = $("#logBy"); lb.replaceChildren(el("option",{value:"",text:"Posting as…"}));
+    teamList().forEach(p=>lb.append(el("option",{value:p.id, text:p.name ? `${p.name} (${p.id})` : p.id})));
+    try { lb.value = localStorage.getItem("noq.me") || ""; } catch(e){}
+    renderDraft(); renderLog(t);
+    if (!dlg.open) dlg.showModal();
+    setTimeout(()=>$("#fTitle").focus(),30);
+  }
+  $("#dlgClose").onclick = $("#cancelBtn").onclick = ()=>dlg.close();
+  $("#taskForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!state.canWrite) { dlg.close(); return; }
+    const title = $("#fTitle").value.trim();
+    if (!title) { $("#fTitle").focus(); toast("Give the task a name first."); return; }
+    const d = state.draft;
+    const body = { title, project:$("#fProject").value.trim(), code:$("#fCode").value.trim(), workstream:$("#fWs").value,
+      due:$("#fDue").value || "", note:$("#fNote").value.trim(), status:d.status, owners:d.owners, days:d.days, weekOf:thisWeek(),
+      updatedAt:new Date().toISOString() };
+    $("#saveBtn").disabled = true;
+    delete body.updatedAt;
+    try {
+      const wasEditing = state.editing;
+      apply(await api("saveTask", state.editing || "", body));
+      dlg.close(); toast(wasEditing ? "Task saved" : "Task added");
+    } catch(err){ writeFailed(err); }
+    finally { $("#saveBtn").disabled = false; }
+  });
+  $("#delBtn").onclick = async () => {
+    const t = state.tasks.find(x=>x.id===state.editing); if (!t) return;
+    if (!confirm(`Delete “${t.title}”? This can’t be undone.`)) return;
+    try { state.editing = null; dlg.close(); apply(await api("deleteTask", t.id)); toast("Task deleted"); } catch(e){ writeFailed(e); }
+  };
+  $("#logAdd").onclick = async () => {
+    const text = $("#logInput").value.trim(); const t = state.tasks.find(x=>x.id===state.editing);
+    if (!text || !t) return;
+    const by = $("#logBy").value;
+    if (!by) { $("#logBy").focus(); toast("Choose who’s posting first."); return; }
+    try { localStorage.setItem("noq.me", by); } catch(e){}
+    $("#logAdd").disabled = true;
+    try { apply(await api("addUpdate", t.id, text, by)); $("#logInput").value=""; toast("Update posted"); }
+    catch(e){ writeFailed(e); }
+    finally { $("#logAdd").disabled = false; }
+  };
+  $("#logInput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#logAdd").click(); } });
+
+  // ---------- team dialog ----------
+  const tdlg = $("#teamDlg");
+  $("#teamBtn").onclick = () => {
+    const body = $("#teamBody"); body.replaceChildren();
+    body.append(el("p",{class:"note", style:"margin:0", text:"Add a full name next to each set of initials so everyone knows who’s who. Initials are what the tracker shows on tasks."}));
+    teamList().forEach(p => body.append(el("div",{class:"field", style:"flex-direction:row;align-items:center;gap:12px"},
+      avatar(p.id), el("input",{"data-id":p.id, value:p.name||"", placeholder:"Full name", "aria-label":`Full name for ${p.id}`, style:"flex:1"}))));
+    body.append(el("div",{class:"field", style:"flex-direction:row;align-items:center;gap:12px"},
+      el("input",{id:"newInit", placeholder:"New initials", maxlength:"4", style:"width:140px;text-transform:uppercase", "aria-label":"New person’s initials"}),
+      el("input",{id:"newName", placeholder:"Full name", style:"flex:1", "aria-label":"New person’s full name"})));
+    tdlg.showModal();
+  };
+  $("#teamClose").onclick = $("#teamCancel").onclick = () => tdlg.close();
+  $("#teamForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const people = [...document.querySelectorAll("#teamBody input[data-id]")].map(i=>({id:i.dataset.id, name:i.value.trim()}));
+    const ni = ($("#newInit")?.value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (ni && !people.some(p=>p.id===ni)) people.push({id:ni, name:($("#newName")?.value||"").trim()});
+    try { apply(await api("saveTeam", people)); tdlg.close(); toast("Team saved"); } catch(err){ writeFailed(err); }
+  });
+
+  // ---------- wiring ----------
+  document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.view = b.dataset.view; try{ localStorage.setItem("noq.view", state.view); }catch(e){} render(); }));
+  $("#addBtn").onclick = () => openTask(null);
+  $("#wsFilter").onchange = e => { state.ws = e.target.value; render(); };
+  let qT; $("#search").addEventListener("input", e => { clearTimeout(qT); qT = setTimeout(()=>{ state.q = e.target.value.trim(); render(); }, 150); });
+  buildDialog();
+  try { const p = localStorage.getItem("noq.person"); if (p) state.person = p; } catch(e){}
+  try { const v = localStorage.getItem("noq.view"); if (["today","board","list"].includes(v)) state.view = v; } catch(e){}
+  try { state.code = localStorage.getItem("noq.code") || ""; } catch(e){}
+  render();
+  setInterval(()=>{ if (state.loaded && !dlg.open) renderHeader(); }, 60000);
+
+  // ---------- data ----------
+  $("#gateForm").addEventListener("submit", e => {
+    e.preventDefault();
+    state.code = $("#gateInput").value.trim();
+    try { localStorage.setItem("noq.code", state.code); } catch(err){}
+    $("#gate").hidden = true; $("#gateErr").textContent = "";
+    refresh();
+  });
+  refresh();
+  setInterval(() => { if (document.visibilityState === "visible" && !dlg.open) refresh(); }, 15000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
+  window.addEventListener("focus", () => refresh());
+})();
+</script>
+</body>
+</html>
