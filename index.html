@@ -341,6 +341,7 @@ dialog::backdrop{background:rgba(17,8,32,.55)}
 }
 @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
 
+
 </style>
 </head>
 <body>
@@ -389,17 +390,17 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
   ];
   const ST = Object.fromEntries(STATUSES.map(s => [s.id, s]));
   const BOARD_ORDER = ["todo", "doing", "wait", "done"];
+  // Business activation stages (stored ids kept from the original pipeline)
   const STAGES = [
-    { id: "lead", label: "Lead", p: 10, color: "#A99BC9" },
-    { id: "qualified", label: "Qualified", p: 25, color: "#8B5CF6" },
-    { id: "proposal", label: "Proposal", p: 50, color: "#6D28D9" },
-    { id: "negotiation", label: "Negotiation", p: 75, color: "#4A0C8B" },
-    { id: "won", label: "Won", p: 100, color: "#1F8A57" },
-    { id: "lost", label: "Lost", p: 0, color: "#C42B2B" }
+    { id: "lead", label: "Identified", p: 10, color: "#A99BC9" },
+    { id: "qualified", label: "Visited", p: 25, color: "#8B5CF6" },
+    { id: "proposal", label: "Interested", p: 50, color: "#6D28D9" },
+    { id: "negotiation", label: "Onboarding", p: 80, color: "#4A0C8B" },
+    { id: "won", label: "Active", p: 100, color: "#1F8A57" },
+    { id: "lost", label: "Not joining", p: 0, color: "#C42B2B" }
   ];
   const SG = Object.fromEntries(STAGES.map(s => [s.id, s]));
   const OPEN_STAGES = ["lead", "qualified", "proposal", "negotiation"];
-  const DEAL_TYPES = ["Funding", "Car wash partner", "Partnership", "Sponsorship", "Customer", "Other"];
   const DEPTS = ["Leadership", "Technical", "Monitoring & evaluation", "Finance", "Marketing", "Other"];
   // Roles from the AO Solvers NO Q Business Plan (Rev B), section 3 and the organogram
   const ROLE_CATALOG = [
@@ -424,7 +425,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
     { id: "home", label: "Home", icon: "home" },
     { id: "tasks", label: "Tasks", icon: "tasks" },
     { id: "meetings", label: "Meetings", icon: "calendar" },
-    { id: "pipeline", label: "Pipeline", icon: "pipeline" },
+    { id: "pipeline", label: "Activation", icon: "pipeline" },
     { id: "team", label: "Team", icon: "users" },
     { id: "settings", label: "Settings", icon: "settings" }
   ];
@@ -527,13 +528,13 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
 
   /* ================= state ================= */
   const state = {
-    data: { tasks: [], team: [], workstreams: [], meetings: [], deals: [] },
+    data: { tasks: [], team: [], workstreams: [], meetings: [], deals: [], settings: [] },
     loaded: false, failed: false, code: lsGet("noq.code", ""), me: lsGet("noq.me", ""),
     route: "home",
     homePerson: "all",
     taskView: lsGet("noq.taskView", "list"), taskPerson: lsGet("noq.person", "all"), taskWs: "all", taskQ: "", showDone: false,
     collapsed: new Set(JSON.parse(lsGet("noq.collapsed", "[]"))),
-    dealView: lsGet("noq.dealView", "board"), dealType: "all", dealOwner: "all"
+    dealView: lsGet("noq.dealView", "board"), dealArea: "all", dealOwner: "all"
   };
   const D = () => state.data;
   const tasks = () => D().tasks || [];
@@ -553,7 +554,6 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
   const fullName = id => { const p = member(id); return p ? (p.name || id) : id; };
   const planned = t => (t.weekOf === thisWeek() && Array.isArray(t.days)) ? t.days : [];
   const dealProb = d => (d.probability === "" || d.probability == null) ? SG[d.stage || "lead"].p : Number(d.probability);
-  const dealValue = d => Number(d.value) || 0;
 
   /* ================= server ================= */
   const API_READY = /^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL.trim());
@@ -706,8 +706,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
     const tk = todayKey();
     const todayPlan = tk ? open.filter(t => planned(t).includes(tk)) : [];
     const upcoming = meetings().filter(m => meetingPhase(m) === "upcoming").sort((a, b) => meetingStart(a) - meetingStart(b));
-    const openDeals = deals().filter(d => OPEN_STAGES.includes(d.stage));
-    const weighted = openDeals.reduce((s, d) => s + dealValue(d) * dealProb(d) / 100, 0);
+    const S = activationSummary();
     const hour = now().getHours();
     const me = member(state.me);
     const hello = (hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening") + (me ? ", " + (me.short || me.name.split(" ")[0]) : "");
@@ -724,7 +723,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
       tile("Open tasks", open.length, overdue.length ? overdue.length + " overdue" : open.filter(t => t.status === "doing").length + " in progress", () => go("tasks"), overdue.length > 0),
       tile("Due within 7 days", week.length, waiting.length + " waiting on others", () => go("tasks")),
       tile("Next meeting", nm ? nm.title : "None scheduled", nm ? fmtDay(nm.date) + ", " + (nm.time || "") : "Schedule one in Meetings", () => go("meetings"), false, true),
-      tile("Weighted pipeline", moneyShort(weighted), openDeals.length + " open opportunities", () => go("pipeline"))
+      tile("Active car washes", S.active.length, perMonth(S.activeMonthly) + ", " + S.open.length + " in the pipeline", () => go("pipeline"))
     ));
 
     // needs attention
@@ -759,7 +758,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
       card("Workstreams", null, el("div", {},
         el("div", { class: "legend", style: "margin-bottom:8px" }, ["done", "doing", "wait", "todo"].map(s => el("span", {}, el("i", { style: "background:" + ST[s].color }), ST[s].label))),
         el("div", { class: "rows" }, wsRows.length ? wsRows : el("div", { class: "empty", text: "No tasks yet." }))), ["Tasks", () => go("tasks")]),
-      card("Pipeline by stage", null, funnel(deals().filter(d => OPEN_STAGES.includes(d.stage)), true), ["Pipeline", () => go("pipeline")])
+      card("Business activation", null, funnel(deals(), true), ["Activation", () => go("pipeline")])
     ));
   }
   function taskLine(t, right) {
@@ -1228,38 +1227,92 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
     setTimeout(() => minutes.focus(), 50);
   }
 
-  /* ================= PIPELINE ================= */
+  /* ================= BUSINESS ACTIVATION (CRM) ================= */
+  // Revenue model defaults, from the Business Plan (Rev B) sections 7 and 8.
+  // PayFast at 3.2% + R2.00 per transaction plus 15% VAT reproduces the plan's R6.53 on a R115 transaction.
+  const MODEL_DEFAULTS = {
+    feeFlat: 15, feePct: 15, feeThreshold: 100,
+    payfastPct: 3.2, payfastFixed: 2, vatPct: 15,
+    settleMethod: "provision", settlePct: 15, settleDaily: 10,
+    subscription: 500, freeMonths: 1,
+    bookingsPerDay: 5, avgPrice: 100, operatingDays: 30,
+    monthlyCosts: 71575
+  };
+  function model() {
+    const row = (D().settings || []).find(s => s.id === "model");
+    const v = row && row.value && typeof row.value === "object" && !Array.isArray(row.value) ? row.value : {};
+    return Object.assign({}, MODEL_DEFAULTS, v);
+  }
+  const numOr = (v, d) => (v === "" || v == null || isNaN(Number(v))) ? d : Number(v);
+  /** NO Q's revenue from one car wash, following the business plan's model. */
+  function estimate(inp, a) {
+    a = a || model(); inp = inp || {};
+    const price = numOr(inp.avgPrice, a.avgPrice), bpd = numOr(inp.bookingsPerDay, a.bookingsPerDay), days = numOr(inp.operatingDays, a.operatingDays);
+    const sub = inp.subscription !== "no";
+    const fee = price < a.feeThreshold ? a.feeFlat : price * a.feePct / 100;
+    const total = price + fee;
+    const payfast = price > 0 ? (total * a.payfastPct / 100 + a.payfastFixed) * (1 + a.vatPct / 100) : 0;
+    const bookings = bpd * days;
+    const settleMonth = a.settleMethod === "daily" ? (bpd > 0 ? days * a.settleDaily : 0) : bookings * fee * a.settlePct / 100;
+    const settlePer = bookings ? settleMonth / bookings : (a.settleMethod === "daily" ? 0 : fee * a.settlePct / 100);
+    const netPer = fee - payfast - settlePer;
+    const txn = bookings * netPer;
+    const subscription = sub ? a.subscription : 0;
+    return { price, bpd, days, sub, fee, total, payfast, settlePer, netPer, bookings,
+      gross: bookings * total, toCarWash: bookings * price, fees: bookings * fee, payfastMonth: bookings * payfast, settleMonth,
+      txn, subscription, monthly: txn + subscription, year1: txn * 12 + subscription * Math.max(0, 12 - a.freeMonths) };
+  }
+  function dealValue(d) { return estimate(d).monthly; }
+  const money2 = n => (n < 0 ? "−" : "") + "R" + Math.abs(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const perMonth = n => money(n) + "/month";
+  const CAR_WASH_TYPES = ["Stationary car wash", "Mobile car wash"];
+  // Areas from the market study (section 2.3) plus the Durban activation region (section 3)
+  const AREAS = ["Esikhawini", "Richards Bay", "Empangeni", "Nseleni", "Mzingazi", "Mtunzini", "Durban"];
+  const SOURCES = ["Market study visit", "Walk-in visit", "Referral", "Social media", "WhatsApp", "Partner introduction"];
+
   function dealMatches(d) {
-    if (state.dealType !== "all" && (d.type || "Other") !== state.dealType) return false;
+    if (state.dealArea !== "all" && (d.area || "") !== state.dealArea) return false;
     if (state.dealOwner !== "all" && d.owner !== state.dealOwner) return false;
     return true;
   }
+  function activationSummary(list) {
+    list = list || deals();
+    const a = model();
+    const active = list.filter(d => d.stage === "won");
+    const open = list.filter(d => OPEN_STAGES.includes(d.stage));
+    const activeMonthly = active.reduce((s, d) => s + dealValue(d), 0);
+    const weighted = open.reduce((s, d) => s + dealValue(d) * dealProb(d) / 100, 0);
+    const planAvg = estimate({}).monthly;
+    const needed = planAvg > 0 ? Math.ceil(a.monthlyCosts / planAvg) : 0;
+    return { a, active, open, activeMonthly, weighted, planAvg, needed, covered: a.monthlyCosts ? activeMonthly / a.monthlyCosts : 0 };
+  }
+
   function viewPipeline(page) {
     const list = deals().filter(dealMatches);
-    const open = list.filter(d => OPEN_STAGES.includes(d.stage));
-    const won = list.filter(d => d.stage === "won"), lost = list.filter(d => d.stage === "lost");
-    const openVal = open.reduce((s, d) => s + dealValue(d), 0);
-    const weighted = open.reduce((s, d) => s + dealValue(d) * dealProb(d) / 100, 0);
-    const noValue = open.filter(d => !dealValue(d)).length;
-    const winRate = won.length + lost.length ? Math.round(won.length / (won.length + lost.length) * 100) : null;
-    page.append(pageHead("Pipeline", "Funding, partnerships and sales opportunities", [btn("New opportunity", "btn-primary", () => openDeal(null), "plus")]));
+    const S = activationSummary(list);
+    page.append(pageHead("Business activation", "Car washes we’re bringing onto NO Q, and what each one is worth", [btn("Add car wash", "btn-primary", () => openDeal(null), "plus")]));
     const tile = (label, val, sub, warn) => el("div", { class: "card tile" }, el("span", { class: "lbl", text: label }), el("span", { class: "val", text: val }), el("span", { class: "sub" + (warn ? " warn" : ""), text: sub }));
     page.append(el("div", { class: "tiles" },
-      tile("Open pipeline", moneyShort(openVal), open.length + " open" + (noValue ? ", " + noValue + " without a value" : ""), false),
-      tile("Weighted forecast", moneyShort(weighted), "Value × likelihood of winning"),
-      tile("Won", moneyShort(won.reduce((s, d) => s + dealValue(d), 0)), won.length + " opportunit" + (won.length === 1 ? "y" : "ies")),
-      tile("Win rate", winRate == null ? "–" : winRate + "%", won.length + " won, " + lost.length + " lost")));
-    const typeOpts = [["all", "All types"]].concat(DEAL_TYPES.map(t => [t, t]));
-    deals().forEach(d => { if (d.type && !DEAL_TYPES.includes(d.type) && !typeOpts.some(o => o[0] === d.type)) typeOpts.push([d.type, d.type]); });
+      tile("Active car washes", S.active.length, perMonth(S.activeMonthly) + " to NO Q"),
+      tile("In the pipeline", S.open.length, "Weighted " + perMonth(S.weighted)),
+      tile("Monthly costs covered", Math.round(S.covered * 100) + "%", "of " + perMonth(S.a.monthlyCosts)),
+      tile("Car washes to break even", S.active.length + " of " + S.needed, "at " + perMonth(S.planAvg) + " each (plan average)")));
+    const areas = [...new Set(AREAS.concat(deals().map(d => d.area).filter(Boolean)))];
     page.append(el("div", { class: "toolbar" },
-      seg([["board", "Board"], ["list", "List"], ["forecast", "Forecast"]], state.dealView, v => { state.dealView = v; lsSet("noq.dealView", v); render(); }),
-      selectEl(typeOpts, state.dealType, v => { state.dealType = v; render(); }, "Filter by type"),
-      selectEl(peopleOptions("All owners"), state.dealOwner, v => { state.dealOwner = v; render(); }, "Filter by owner")));
-    if (!deals().length) { page.append(el("div", { class: "notice", text: "No opportunities yet. Add funding applications, partners or car wash leads with “New opportunity”." })); return; }
+      seg([["board", "Board"], ["list", "List"], ["forecast", "Forecast"], ["estimator", "Estimator"]], state.dealView, v => { state.dealView = v; lsSet("noq.dealView", v); render(); }),
+      state.dealView !== "estimator" ? selectEl([["all", "All areas"]].concat(areas.map(x => [x, x])), state.dealArea, v => { state.dealArea = v; render(); }, "Filter by area") : null,
+      state.dealView !== "estimator" ? selectEl(peopleOptions("All activation officers"), state.dealOwner, v => { state.dealOwner = v; render(); }, "Filter by owner") : null));
+    if (state.dealView === "estimator") { page.append(estimatorView()); return; }
+    if (!deals().length) {
+      page.append(el("div", { class: "notice" }, el("b", { text: "No car washes in the pipeline yet." }), el("br"),
+        "Use “Add car wash” for each business you visit. Enter their prices and expected bookings and the tracker estimates what they’re worth to NO Q each month."));
+      return;
+    }
     if (state.dealView === "board") page.append(dealBoard(list));
     else if (state.dealView === "list") page.append(dealTable(list));
-    else page.append(forecastView(list));
+    else page.append(forecastView(list, S));
   }
+
   function dealBoard(list) {
     const b = el("div", { class: "board six" });
     STAGES.forEach(s => {
@@ -1267,43 +1320,47 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
       const sum = items.reduce((t, d) => t + dealValue(d), 0);
       const col = el("section", { class: "col", "aria-label": s.label },
         el("div", { class: "col-h", style: "flex-wrap:wrap" }, sdot(s.color), el("h2", { text: s.label }), el("span", { class: "count", text: items.length }),
-          el("span", { class: "sum", text: sum ? moneyShort(sum) + (OPEN_STAGES.includes(s.id) ? " · " + s.p + "% likely" : "") : (OPEN_STAGES.includes(s.id) ? s.p + "% likely" : " ") })));
+          el("span", { class: "sum", text: (sum ? moneyShort(sum) + "/mo" : "") + (OPEN_STAGES.includes(s.id) ? (sum ? " · " : "") + s.p + "% likely" : "") || " " })));
       items.forEach(d => col.append(el("div", { class: "kcard", role: "button", tabindex: "0", draggable: "true",
         onclick: () => openDeal(d.id), onkeydown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDeal(d.id); } },
         ondragstart: e => { dragId = d.id; e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", d.id); } catch (_) {} } },
-        el("span", { class: "tag", text: [d.account, d.type].filter(Boolean).join(" · ") }),
+        el("span", { class: "tag", text: [d.area, (d.type || "").replace(" car wash", "")].filter(Boolean).join(" · ") }),
         el("span", { class: "t", text: d.name }),
-        d.nextStep && OPEN_STAGES.includes(d.stage) ? el("span", { class: "tag", style: "font-weight:500", text: "Next: " + d.nextStep }) : null,
-        el("span", { class: "foot" }, el("span", { class: "val", text: dealValue(d) ? money(dealValue(d)) : "No value" }),
-          el("span", { style: "display:flex;gap:6px;align-items:center" }, d.closeDate ? el("span", { text: fmtDay(d.closeDate) }) : null, d.owner ? avatar(d.owner) : null)))));
+        d.nextStep && OPEN_STAGES.includes(d.stage) ? el("span", { class: "tag", style: "font-weight:500", text: "Next: " + d.nextStep + (d.nextDate ? " (" + fmtDay(d.nextDate) + ")" : "") }) : null,
+        el("span", { class: "foot" }, el("span", { class: "val", text: perMonth(dealValue(d)) }),
+          el("span", { style: "display:flex;gap:6px;align-items:center" }, d.owner ? avatar(d.owner) : null)))));
       col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("drop"); });
       col.addEventListener("dragleave", () => col.classList.remove("drop"));
-      col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const id = dragId; dragId = null; const d = deals().find(x => x.id === id); if (d && d.stage !== s.id) save("deals", id, { stage: s.id }, "Moved to " + s.label).catch(() => {}); });
+      col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const id = dragId; dragId = null; const d = deals().find(x => x.id === id); if (d && d.stage !== s.id) save("deals", id, { stage: s.id, value: Math.round(dealValue(d)) }, "Moved to " + s.label).catch(() => {}); });
       b.append(col);
     });
     return b;
   }
+
   function dealTable(list) {
     const rows = list.slice().sort((a, b) => STAGES.findIndex(s => s.id === a.stage) - STAGES.findIndex(s => s.id === b.stage) || dealValue(b) - dealValue(a));
+    const head = ["Car wash", "Area", "Type", "Stage", "Bookings / day", "Avg price", "Per month", "Likely", "Weighted", "Go-live", "Owner", "Next step"];
     return el("div", { class: "card" }, el("div", { class: "tablewrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Opportunity", "Organisation", "Type", "Stage", "Value", "Likely", "Weighted", "Expected close", "Owner", "Next step"].map((h, i) => el("th", { scope: "col", class: [4, 5, 6].includes(i) ? "num" : null, text: h })))),
-      el("tbody", {}, rows.map(d => el("tr", { tabindex: "0", onclick: () => openDeal(d.id), onkeydown: e => { if (e.key === "Enter") openDeal(d.id); } },
-        el("td", { style: "font-weight:600", text: d.name }), el("td", { text: d.account || "" }), el("td", { text: d.type || "" }),
+      el("thead", {}, el("tr", {}, head.map((h, i) => el("th", { scope: "col", class: [4, 5, 6, 7, 8].includes(i) ? "num" : null, text: h })))),
+      el("tbody", {}, rows.map(d => { const e = estimate(d); return el("tr", { tabindex: "0", onclick: () => openDeal(d.id), onkeydown: ev => { if (ev.key === "Enter") openDeal(d.id); } },
+        el("td", { style: "font-weight:600", text: d.name }), el("td", { text: d.area || "" }), el("td", { text: (d.type || "").replace(" car wash", "") }),
         el("td", {}, el("span", { class: "pill plain" }, sdot(SG[d.stage || "lead"].color), SG[d.stage || "lead"].label)),
-        el("td", { class: "num", text: dealValue(d) ? money(dealValue(d)) : "–" }), el("td", { class: "num", text: dealProb(d) + "%" }),
-        el("td", { class: "num", text: dealValue(d) ? money(dealValue(d) * dealProb(d) / 100) : "–" }),
+        el("td", { class: "num", text: e.bpd }), el("td", { class: "num", text: money(e.price) }),
+        el("td", { class: "num", style: "font-weight:700", text: money(e.monthly) }), el("td", { class: "num", text: dealProb(d) + "%" }),
+        el("td", { class: "num", text: money(e.monthly * dealProb(d) / 100) }),
         el("td", { text: d.closeDate ? fmtDay(d.closeDate) : "" }), el("td", {}, d.owner ? avatar(d.owner) : ""),
-        el("td", { class: "muted", text: d.nextStep || "" })))))));
+        el("td", { class: "muted", text: d.nextStep || "" })); })))));
   }
+
   function funnel(list, compact) {
-    const stages = compact ? OPEN_STAGES : STAGES.map(s => s.id);
+    const stages = compact ? OPEN_STAGES.concat("won") : STAGES.map(s => s.id);
     const data = stages.map(id => { const ds = list.filter(d => (d.stage || "lead") === id); return { s: SG[id], n: ds.length, v: ds.reduce((t, d) => t + dealValue(d), 0) }; });
     const maxN = Math.max(1, ...data.map(x => x.n));
-    if (!list.length) return el("div", { class: "empty", text: "No open opportunities." });
+    if (!list.length) return el("div", { class: "empty", text: "No car washes in the pipeline yet." });
     return el("div", { class: "funnel" }, data.map(x => el("div", { class: "frow" },
       el("span", { class: "lb", text: x.s.label }),
       el("span", { class: "track" }, el("span", { class: "fill", style: `display:block;width:${x.n / maxN * 100}%;background:${x.s.color}${x.n ? "" : ";min-width:0"}` })),
-      el("span", { class: "vl" }, el("b", { text: x.n }), " · " + (x.v ? moneyShort(x.v) : "R0")))));
+      el("span", { class: "vl" }, el("b", { text: x.n }), " · " + (x.v ? moneyShort(x.v) + "/mo" : "R0")))));
   }
   function svgEl(tag, attrs, ...kids) {
     const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -1311,92 +1368,187 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
     kids.flat().forEach(k => { if (k != null) n.append(k.nodeType ? k : document.createTextNode(String(k))); });
     return n;
   }
-  function forecastView(list) {
-    // months: this month + next 5, then "Later", "No date"
+  function niceStep(max) { const raw = max / 4; const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+
+  function forecastView(list, S) {
+    // Monthly run-rate over the next 6 months: active car washes now, plus open leads from their expected go-live month.
     const base = new Date(now().getFullYear(), now().getMonth(), 1);
     const months = Array.from({ length: 6 }, (_, i) => new Date(base.getFullYear(), base.getMonth() + i, 1));
     const key = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-    const buckets = months.map(d => ({ label: d.toLocaleDateString("en-GB", { month: "short" }), k: key(d), weighted: 0, best: 0, won: 0 }));
-    buckets.push({ label: "Later", k: "later", weighted: 0, best: 0, won: 0 }, { label: "No date", k: "none", weighted: 0, best: 0, won: 0 });
-    const lastKey = key(months[5]);
-    list.forEach(d => {
-      if (d.stage === "lost") return;
-      let b;
-      if (!d.closeDate) b = buckets.find(x => x.k === "none");
-      else { const k = d.closeDate.slice(0, 7); b = buckets.find(x => x.k === k) || (k > lastKey ? buckets.find(x => x.k === "later") : null); }
-      if (!b) return; // closed before this month
-      if (d.stage === "won") b.won += dealValue(d);
-      else { b.best += dealValue(d); b.weighted += dealValue(d) * dealProb(d) / 100; }
+    const activeNow = S.activeMonthly;
+    const pts = months.map(m => {
+      const k = key(m);
+      const due = S.open.filter(d => d.closeDate && d.closeDate.slice(0, 7) <= k);
+      return { label: m.toLocaleDateString("en-GB", { month: "short" }), weighted: activeNow + due.reduce((s, d) => s + dealValue(d) * dealProb(d) / 100, 0), best: activeNow + due.reduce((s, d) => s + dealValue(d), 0) };
     });
-    const W = 640, H = 260, P = { l: 56, r: 10, t: 14, b: 30 };
-    const max = Math.max(1, ...buckets.map(b => Math.max(b.best, b.won)));
-    const step = niceStep(max);
-    const top = Math.ceil(max / step) * step;
+    const cost = S.a.monthlyCosts;
+    const W = 640, H = 270, P = { l: 60, r: 12, t: 16, b: 30 };
+    const max = Math.max(1, cost, ...pts.map(p => p.best));
+    const step = niceStep(max), top = Math.ceil(max / step) * step;
     const y = v => P.t + (H - P.t - P.b) * (1 - v / top);
-    const bw = (W - P.l - P.r) / buckets.length;
-    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Forecast by expected close month" });
-    for (let v = 0; v <= top + 1; v += step) {
-      svg.append(svgEl("line", { x1: P.l, x2: W - P.r, y1: y(v), y2: y(v), class: "axis" }), svgEl("text", { x: P.l - 8, y: y(v) + 4, "text-anchor": "end" }, moneyShort(v)));
-    }
-    buckets.forEach((b, i) => {
-      const x0 = P.l + i * bw + bw * 0.14, w = (bw * 0.72) / 2;
-      const tip = `${b.label}: weighted ${money(b.weighted)}, best case ${money(b.best)}, won ${money(b.won)}`;
-      svg.append(svgEl("g", {}, svgEl("title", {}, tip),
-        svgEl("rect", { x: x0, y: y(b.best), width: w, height: Math.max(0, y(0) - y(b.best)), rx: 3, fill: "var(--surface-3)" }),
-        svgEl("rect", { x: x0, y: y(b.weighted), width: w, height: Math.max(0, y(0) - y(b.weighted)), rx: 3, fill: "var(--brand)" }),
-        svgEl("rect", { x: x0 + w + 2, y: y(b.won), width: w - 2, height: Math.max(0, y(0) - y(b.won)), rx: 3, fill: "var(--done)" })),
-        svgEl("text", { x: P.l + i * bw + bw / 2, y: H - 10, "text-anchor": "middle" }, b.label));
+    const bw = (W - P.l - P.r) / pts.length;
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Projected monthly contribution against monthly costs" });
+    for (let v = 0; v <= top + 1; v += step) svg.append(svgEl("line", { x1: P.l, x2: W - P.r, y1: y(v), y2: y(v), class: "axis" }), svgEl("text", { x: P.l - 8, y: y(v) + 4, "text-anchor": "end" }, moneyShort(v)));
+    pts.forEach((p, i) => {
+      const x0 = P.l + i * bw + bw * 0.2, w = bw * 0.6;
+      svg.append(svgEl("g", {}, svgEl("title", {}, `${p.label}: weighted ${perMonth(p.weighted)}, if every lead joins ${perMonth(p.best)}`),
+        svgEl("rect", { x: x0, y: y(p.best), width: w, height: Math.max(0, y(0) - y(p.best)), rx: 4, fill: "var(--surface-3)" }),
+        svgEl("rect", { x: x0, y: y(p.weighted), width: w, height: Math.max(0, y(0) - y(p.weighted)), rx: 4, fill: "var(--brand)" })),
+        svgEl("text", { x: P.l + i * bw + bw / 2, y: H - 10, "text-anchor": "middle" }, p.label));
     });
+    if (cost) svg.append(svgEl("line", { x1: P.l, x2: W - P.r, y1: y(cost), y2: y(cost), stroke: "var(--accent)", "stroke-width": 2, "stroke-dasharray": "6 5" }),
+      svgEl("text", { x: W - P.r, y: y(cost) - 6, "text-anchor": "end", style: "fill:var(--accent);font-weight:700" }, "Monthly costs " + moneyShort(cost)));
+    const noDate = S.open.filter(d => !d.closeDate).length;
     const legend = el("div", { class: "legend", style: "margin-bottom:10px" },
-      el("span", {}, el("i", { style: "background:var(--brand)" }), "Weighted forecast"), el("span", {}, el("i", { style: "background:var(--surface-3)" }), "Best case (full value)"),
-      el("span", {}, el("i", { style: "background:var(--done)" }), "Won"));
-    const noDate = list.filter(d => OPEN_STAGES.includes(d.stage) && !d.closeDate).length;
-    // by type
-    const types = {};
-    list.forEach(d => { const t = d.type || "Other"; types[t] = types[t] || { n: 0, open: 0, won: 0 }; types[t].n++; if (OPEN_STAGES.includes(d.stage)) types[t].open += dealValue(d); if (d.stage === "won") types[t].won += dealValue(d); });
-    const tmax = Math.max(1, ...Object.values(types).map(t => t.open + t.won));
-    const typeRows = Object.entries(types).sort((a, b) => (b[1].open + b[1].won) - (a[1].open + a[1].won)).map(([t, v]) => el("div", { class: "frow" },
-      el("span", { class: "lb", text: t }),
-      el("span", { class: "track", style: "display:flex" }, v.won ? el("span", { class: "fill", style: `display:block;border-radius:8px 0 0 8px;width:${v.won / tmax * 100}%;background:var(--done)` }) : null,
-        v.open ? el("span", { class: "fill", style: `display:block;border-radius:${v.won ? "0 8px 8px 0" : "8px"};width:${v.open / tmax * 100}%;background:var(--brand)` }) : null),
-      el("span", { class: "vl" }, el("b", { text: v.n }), " · " + moneyShort(v.open + v.won))));
-    // owners
+      el("span", {}, el("i", { style: "background:var(--brand)" }), "Expected (weighted by likelihood)"), el("span", {}, el("i", { style: "background:var(--surface-3)" }), "If every lead joins"),
+      el("span", {}, el("i", { style: "background:var(--accent);height:3px" }), "Monthly costs to cover"));
+    // by area
+    const byArea = {};
+    list.forEach(d => { const k = d.area || "No area"; byArea[k] = byArea[k] || { active: 0, open: 0, activeVal: 0, w: 0 }; if (d.stage === "won") { byArea[k].active++; byArea[k].activeVal += dealValue(d); } else if (OPEN_STAGES.includes(d.stage)) { byArea[k].open++; byArea[k].w += dealValue(d) * dealProb(d) / 100; } });
+    const amax = Math.max(1, ...Object.values(byArea).map(v => v.activeVal + v.w));
+    const areaRows = Object.entries(byArea).sort((a, b) => (b[1].activeVal + b[1].w) - (a[1].activeVal + a[1].w)).map(([k, v]) => el("div", { class: "frow" },
+      el("span", { class: "lb", text: k }),
+      el("span", { class: "track", style: "display:flex" },
+        v.activeVal ? el("span", { class: "fill", style: `display:block;border-radius:8px 0 0 8px;width:${v.activeVal / amax * 100}%;background:var(--done)` }) : null,
+        v.w ? el("span", { class: "fill", style: `display:block;border-radius:${v.activeVal ? "0 8px 8px 0" : "8px"};width:${v.w / amax * 100}%;background:var(--brand)` }) : null),
+      el("span", { class: "vl" }, el("b", { text: v.active }), " active · " + v.open + " open")));
+    // by officer
     const owners = {};
-    list.forEach(d => { const o = d.owner || "—"; owners[o] = owners[o] || { open: 0, val: 0, w: 0, won: 0 }; if (OPEN_STAGES.includes(d.stage)) { owners[o].open++; owners[o].val += dealValue(d); owners[o].w += dealValue(d) * dealProb(d) / 100; } if (d.stage === "won") owners[o].won += dealValue(d); });
+    list.forEach(d => { const o = d.owner || "—"; owners[o] = owners[o] || { open: 0, active: 0, aVal: 0, w: 0 }; if (d.stage === "won") { owners[o].active++; owners[o].aVal += dealValue(d); } else if (OPEN_STAGES.includes(d.stage)) { owners[o].open++; owners[o].w += dealValue(d) * dealProb(d) / 100; } });
     const ownerTable = el("div", { class: "tablewrap" }, el("table", { style: "min-width:0" },
-      el("thead", {}, el("tr", {}, ["Owner", "Open", "Open value", "Weighted", "Won"].map((h, i) => el("th", { class: i ? "num" : null, text: h })))),
-      el("tbody", {}, Object.entries(owners).sort((a, b) => b[1].w - a[1].w).map(([o, v]) => el("tr", { style: "cursor:default" },
+      el("thead", {}, el("tr", {}, ["Officer", "Active", "Active /mo", "Open", "Weighted /mo"].map((h, i) => el("th", { class: i ? "num" : null, text: h })))),
+      el("tbody", {}, Object.entries(owners).sort((a, b) => (b[1].aVal + b[1].w) - (a[1].aVal + a[1].w)).map(([o, v]) => el("tr", { style: "cursor:default" },
         el("td", {}, o === "—" ? "Unassigned" : el("span", { style: "display:inline-flex;gap:8px;align-items:center" }, avatar(o), shortName(o))),
-        el("td", { class: "num", text: v.open }), el("td", { class: "num", text: money(v.val) }), el("td", { class: "num", text: money(v.w) }), el("td", { class: "num", text: money(v.won) }))))));
+        el("td", { class: "num", text: v.active }), el("td", { class: "num", text: money(v.aVal) }), el("td", { class: "num", text: v.open }), el("td", { class: "num", text: money(v.w) }))))));
     return el("div", {},
       el("div", { class: "grid2" },
-        card("Forecast by expected close", null, el("div", {}, legend, svg, noDate ? el("div", { class: "muted", style: "font-size:13px;margin-top:6px", text: noDate + " open opportunit" + (noDate === 1 ? "y has" : "ies have") + " no expected close date, shown under “No date”." }) : null)),
+        card("Monthly contribution as car washes go live", null, el("div", {}, legend, svg,
+          el("div", { class: "muted", style: "font-size:13px;margin-top:6px", text: "Each lead counts from its expected go-live month." + (noDate ? " " + noDate + " open lead" + (noDate === 1 ? " has" : "s have") + " no go-live date yet and " + (noDate === 1 ? "isn’t" : "aren’t") + " included." : "") }))),
         card("Pipeline by stage", null, funnel(list, false))),
       el("div", { class: "grid2 even" },
-        card("By type", null, el("div", {}, el("div", { class: "legend", style: "margin-bottom:10px" }, el("span", {}, el("i", { style: "background:var(--done)" }), "Won"), el("span", {}, el("i", { style: "background:var(--brand)" }), "Open")),
-          el("div", { class: "funnel" }, typeRows))),
-        card("By owner", null, ownerTable)));
+        card("By area", null, el("div", {}, el("div", { class: "legend", style: "margin-bottom:10px" }, el("span", {}, el("i", { style: "background:var(--done)" }), "Active per month"), el("span", {}, el("i", { style: "background:var(--brand)" }), "Weighted pipeline per month")),
+          el("div", { class: "funnel" }, areaRows))),
+        card("By activation officer", null, ownerTable)));
   }
-  function niceStep(max) { const raw = max / 4; const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
 
+  /* ---------- revenue breakdown pieces ---------- */
+  function waterfall(e) {
+    const rows = [
+      ["Customer pays", e.total, "var(--todo)", ""],
+      ["Paid out to the car wash", -e.price, "var(--done)", "The car wash receives its full price"],
+      ["NO Q booking fee", e.fee, "var(--brand)", e.price < model().feeThreshold ? "Flat fee below " + money(model().feeThreshold) : model().feePct + "% of the service price"],
+      ["PayFast fee", -e.payfast, "var(--late)", model().payfastPct + "% + " + money2(model().payfastFixed) + " + VAT"],
+      ["Merchant settlement", -e.settlePer, "var(--wait)", model().settleMethod === "daily" ? money(model().settleDaily) + " per daily payout, shared across the day’s bookings" : model().settlePct + "% of the booking fee"],
+      ["NO Q keeps per booking", e.netPer, "var(--accent)", ""]
+    ];
+    const max = Math.max(e.total, 1);
+    return el("div", { style: "display:flex;flex-direction:column;gap:12px" }, rows.map(([lb, v, c, hint], i) => el("div", { style: i === 5 ? "padding-top:10px;border-top:1px solid var(--line)" : "" },
+      el("div", { style: "display:flex;justify-content:space-between;gap:12px;align-items:baseline" },
+        el("span", { style: "font-weight:" + (i === 5 ? 800 : 600) + ";font-size:14px", text: lb }),
+        el("span", { style: "font-variant-numeric:tabular-nums;white-space:nowrap;" + (i === 5 ? "font-weight:800;color:var(--brand)" : "color:var(--muted)"), text: money2(v) })),
+      hint ? el("div", { class: "muted", style: "font-size:12px", text: hint }) : null,
+      el("div", { style: "height:8px;border-radius:999px;background:var(--surface-2);margin-top:5px;overflow:hidden" },
+        Math.abs(v) > 0 ? el("div", { style: `height:100%;border-radius:999px;width:${Math.min(100, Math.abs(v) / max * 100)}%;background:${c}` }) : null))));
+  }
+  function monthTable(e, count) {
+    count = count || 1;
+    const rows = [
+      ["Bookings per month", Math.round(e.bookings * count).toLocaleString("en-ZA"), ""],
+      ["Paid by customers", money(e.gross * count), ""],
+      ["Paid out to car washes", "−" + money(e.toCarWash * count), "muted"],
+      ["NO Q booking fees", money(e.fees * count), ""],
+      ["PayFast fees", "−" + money(e.payfastMonth * count), "muted"],
+      ["Merchant settlement", "−" + money(e.settleMonth * count), "muted"],
+      ["Net from bookings", money(e.txn * count), "b"],
+      ["Subscription", e.sub ? money(e.subscription * count) : "Not charged", ""],
+      ["NO Q per month", money(e.monthly * count), "total"],
+      ["First year (" + model().freeMonths + " month" + (model().freeMonths === 1 ? "" : "s") + " subscription free)", money(e.year1 * count), "b"]
+    ];
+    return el("table", { style: "min-width:0" }, el("tbody", {}, rows.map(([l, v, k]) => el("tr", { style: "cursor:default" },
+      el("td", { class: k === "muted" ? "muted" : null, style: k === "total" ? "font-weight:800;font-size:16px" : k === "b" ? "font-weight:700" : null, text: l }),
+      el("td", { class: "num" + (k === "muted" ? " muted" : ""), style: k === "total" ? "font-weight:800;font-size:16px;color:var(--brand)" : k === "b" ? "font-weight:700" : null, text: v })))));
+  }
+
+  function estimatorView() {
+    const a = model();
+    const inputs = { avgPrice: lsGet("noq.est.price", a.avgPrice), bookingsPerDay: lsGet("noq.est.bpd", a.bookingsPerDay), operatingDays: lsGet("noq.est.days", a.operatingDays), subscription: lsGet("noq.est.sub", "yes"), count: lsGet("noq.est.count", 1) };
+    const out = el("div", { class: "stack" });
+    const mk = (key, label, attrs, hint) => {
+      const i = inp("number", inputs[key], Object.assign({ min: "0" }, attrs));
+      i.addEventListener("input", () => { inputs[key] = i.value; lsSet("noq.est." + ({ avgPrice: "price", bookingsPerDay: "bpd", operatingDays: "days", count: "count" })[key], i.value); draw(); });
+      return fld(label, i, { hint });
+    };
+    const sub = sel([["yes", "Yes, " + perMonth(a.subscription) + " after " + a.freeMonths + " free month" + (a.freeMonths === 1 ? "" : "s")], ["no", "No subscription"]], inputs.subscription);
+    sub.addEventListener("change", () => { inputs.subscription = sub.value; lsSet("noq.est.sub", sub.value); draw(); });
+    const form = el("div", { class: "dlg-b", style: "padding:0;grid-template-columns:1fr" },
+      mk("avgPrice", "Average wash price (R)", { step: "5" }, "Business plan example: R100"),
+      mk("bookingsPerDay", "NO Q bookings per day", { step: "1" }, "Business plan base case: 5"),
+      mk("operatingDays", "Operating days per month", { max: "31" }, "Business plan: 30"),
+      fld("Subscription", sub),
+      mk("count", "Number of car washes like this", { step: "1", min: "1" }, "See the total for a whole cluster"));
+    function draw() {
+      const e = estimate(inputs);
+      const n = Math.max(1, Math.round(numOr(inputs.count, 1)));
+      const need = e.monthly > 0 ? Math.ceil(a.monthlyCosts / e.monthly) : null;
+      out.replaceChildren(
+        el("div", { class: "tiles", style: "grid-template-columns:repeat(3,minmax(0,1fr));margin:0" },
+          el("div", { class: "card tile" }, el("span", { class: "lbl", text: "NO Q keeps per booking" }), el("span", { class: "val", text: money2(e.netPer) }), el("span", { class: "sub", text: "from a " + money(e.total) + " customer payment" })),
+          el("div", { class: "card tile" }, el("span", { class: "lbl", text: n > 1 ? "Per month, " + n + " car washes" : "Per month, this car wash" }), el("span", { class: "val", text: money(e.monthly * n) }), el("span", { class: "sub", text: money(e.year1 * n) + " in the first year" })),
+          el("div", { class: "card tile" }, el("span", { class: "lbl", text: "Car washes like this to cover costs" }), el("span", { class: "val", text: need == null ? "–" : need }), el("span", { class: "sub", text: "Monthly costs " + money(a.monthlyCosts) }))),
+        el("div", { class: "grid2 even", style: "margin:0" },
+          card("Where each booking’s money goes", null, waterfall(e)),
+          card(n > 1 ? "Monthly breakdown for " + n + " car washes" : "Monthly breakdown", null, monthTable(e, n))));
+    }
+    draw();
+    return el("div", { class: "grid2", style: "grid-template-columns:minmax(0,340px) minmax(0,1fr);align-items:start" },
+      card("What if…", null, el("div", {}, form, el("p", { class: "muted", style: "font-size:13px;margin:14px 0 0" }, "Fees, PayFast and settlement costs follow the business plan. Change them under ",
+        el("button", { type: "button", class: "more", style: "padding:0;border:0;background:none;color:var(--brand);font-weight:700", onclick: () => go("settings") }, "Settings"), "."))),
+      out);
+  }
+
+  /* ---------- car wash record ---------- */
   function openDeal(id) {
     const d0 = id ? deals().find(x => x.id === id) : null;
+    const a = model();
     const d = { stage: d0 ? d0.stage || "lead" : "lead" };
-    const name = inp("text", d0 ? d0.name : "", { placeholder: "e.g. Esikhawini car wash onboarding, or NYDA grant" });
-    const account = inp("text", d0 ? d0.account : "", { placeholder: "Organisation or business" });
-    const typeOpts = DEAL_TYPES.map(t => [t, t]); if (d0 && d0.type && !DEAL_TYPES.includes(d0.type)) typeOpts.push([d0.type, d0.type]);
-    const type = sel(typeOpts, d0 ? d0.type || "Other" : "Funding");
-    const value = inp("number", d0 ? d0.value : "", { min: "0", step: "100", placeholder: "Amount in rand" });
+    const listId = "dl" + uid(), srcId = "ds" + uid();
+    const name = inp("text", d0 ? d0.name : "", { placeholder: "e.g. Engadini Car Wash" });
+    const area = inp("text", d0 ? d0.area : (state.dealArea !== "all" ? state.dealArea : ""), { placeholder: "e.g. Esikhawini", list: listId });
+    const areaList = el("datalist", { id: listId }, AREAS.map(x => el("option", { value: x })));
+    const typeOpts = CAR_WASH_TYPES.map(t => [t, t]); if (d0 && d0.type && !CAR_WASH_TYPES.includes(d0.type)) typeOpts.push([d0.type, d0.type]);
+    const type = sel(typeOpts, d0 ? d0.type || CAR_WASH_TYPES[0] : CAR_WASH_TYPES[0]);
+    const contact = inp("text", d0 ? d0.contact : "", { placeholder: "Owner or manager" });
+    const contactInfo = inp("text", d0 ? d0.contactInfo : "", { placeholder: "Phone or WhatsApp number" });
+    const owner = sel([["", "Unassigned"]].concat(team().filter(p => p.status !== "Inactive").map(p => [p.id, (p.short || p.name) + " (" + p.id + ")"])), d0 ? d0.owner : state.me);
+    const source = inp("text", d0 ? d0.source : "", { placeholder: "e.g. Market study visit", list: srcId });
+    const srcList = el("datalist", { id: srcId }, SOURCES.map(x => el("option", { value: x })));
+    const close = inp("date", d0 ? d0.closeDate : "");
     const prob = inp("number", d0 && d0.probability !== "" ? d0.probability : "", { min: "0", max: "100", step: "5" });
     const probHint = el("span", { class: "hint" });
-    const close = inp("date", d0 ? d0.closeDate : "");
-    const owner = sel([["", "Unassigned"]].concat(team().filter(p => p.status !== "Inactive").map(p => [p.id, (p.short || p.name) + " (" + p.id + ")"])), d0 ? d0.owner : state.me);
-    const contact = inp("text", d0 ? d0.contact : "", { placeholder: "Name" });
-    const contactInfo = inp("text", d0 ? d0.contactInfo : "", { placeholder: "Phone or email" });
-    const source = inp("text", d0 ? d0.source : "", { placeholder: "e.g. Market study, referral, walk-in" });
-    const nextStep = inp("text", d0 ? d0.nextStep : "", { placeholder: "e.g. Send proposal" });
+    const nextStep = inp("text", d0 ? d0.nextStep : "", { placeholder: "e.g. Demo the app to the owner" });
     const nextDate = inp("date", d0 ? d0.nextDate : "");
-    const notes = ta(d0 ? d0.notes : "");
+    const notes = ta(d0 ? d0.notes : "", { placeholder: "Card machine? Uses WhatsApp for bookings? Busy days? Concerns raised?" });
+    // revenue inputs
+    const cars = inp("number", d0 ? d0.carsPerDay : "", { min: "0", step: "1", placeholder: "e.g. 25" });
+    const bpd = inp("number", d0 ? d0.bookingsPerDay : "", { min: "0", step: "1", placeholder: String(a.bookingsPerDay) });
+    const price = inp("number", d0 ? d0.avgPrice : "", { min: "0", step: "5", placeholder: String(a.avgPrice) });
+    const days = inp("number", d0 ? d0.operatingDays : "", { min: "0", max: "31", step: "1", placeholder: String(a.operatingDays) });
+    const sub = sel([["yes", "Yes, " + perMonth(a.subscription)], ["no", "No"]], d0 ? d0.subscription || "yes" : "yes");
+    const bpdHint = el("span", { class: "hint" });
+    const result = el("div");
+    const current = () => ({ carsPerDay: cars.value, bookingsPerDay: bpd.value, avgPrice: price.value, operatingDays: days.value, subscription: sub.value });
+    function drawEstimate() {
+      const e = estimate(current());
+      const c = Number(cars.value);
+      bpdHint.textContent = "Leave blank for the plan’s " + a.bookingsPerDay + " a day." + (c > 0 ? " That’s " + Math.round(e.bpd / c * 100) + "% of the " + c + " cars they wash a day." : "");
+      result.replaceChildren(el("div", { class: "card", style: "padding:16px 18px;box-shadow:none;background:var(--surface-2);border:0" },
+        el("div", { style: "display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px" },
+          el("span", { style: "font-family:Montserrat,Arial,sans-serif;font-size:24px;font-weight:800;color:var(--brand)", text: perMonth(e.monthly) }),
+          el("span", { class: "muted", text: "estimated to NO Q · " + money(e.year1) + " in the first year · " + money2(e.netPer) + " per booking" })),
+        el("div", { class: "grid2 even", style: "margin:0;gap:18px" }, waterfall(e), monthTable(e, 1))));
+    }
+    [cars, bpd, price, days].forEach(i => i.addEventListener("input", drawEstimate)); sub.addEventListener("change", drawEstimate);
+    drawEstimate();
     const stageBox = el("div", { class: "sseg six" });
     const draw = () => {
       stageBox.replaceChildren(...STAGES.map(s => el("button", { type: "button", "aria-pressed": String(d.stage === s.id), onclick: () => { d.stage = s.id; draw(); } }, sdot(s.color), s.label)));
@@ -1405,30 +1557,75 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
     };
     draw();
     const log = d0 ? logEditor("deals", d0.id, d0.activity) : null;
-    const body = el("div", { class: "dlg-b" },
-      fld("Opportunity", name, { full: true }), fld("Organisation", account), fld("Type", type),
+    const section = t => el("div", { class: "field full", style: "padding-top:6px" }, el("h3", { style: "font-size:15px", text: t }));
+    const body = el("div", { class: "dlg-b" }, areaList, srcList,
+      fld("Car wash", name, { full: true }), fld("Area", area), fld("Type", type),
       fld("Stage", stageBox, { full: true }),
-      fld("Value (R)", value), el("div", { class: "field" }, el("label", { text: "Likelihood of winning (%)" }), prob, probHint),
-      fld("Expected close", close), fld("Owner", owner),
       fld("Contact person", contact), fld("Contact details", contactInfo),
+      fld("Activation officer", owner), fld("How we found them", source),
+      section("Revenue estimate"),
+      fld("Cars washed per day (all customers)", cars, { hint: "What they handle today, walk-ins included." }),
+      el("div", { class: "field" }, el("label", { text: "Expected NO Q bookings per day" }), bpd, bpdHint),
+      fld("Average wash price (R)", price, { hint: "Leave blank for the plan’s " + money(a.avgPrice) + "." }), fld("Operating days per month", days, { hint: "Leave blank for the plan’s " + a.operatingDays + "." }),
+      fld("Pays the subscription", sub), el("div"),
+      el("div", { class: "field full" }, result),
+      section("Next steps"),
       fld("Next step", nextStep), fld("Next step date", nextDate),
-      fld("Source", source, { full: true }), fld("Notes", notes, { full: true }), log ? log.node : null);
-    const saveBtn = btn(d0 ? "Save" : "Add opportunity", "btn-primary", async () => {
-      if (!name.value.trim()) { name.focus(); toast("Name the opportunity first."); return; }
+      fld("Expected go-live", close, { hint: "When they should start taking NO Q bookings. Used in the forecast." }),
+      el("div", { class: "field" }, el("label", { text: "Likelihood of joining (%)" }), prob, probHint),
+      fld("Notes", notes, { full: true }), log ? log.node : null);
+    const saveBtn = btn(d0 ? "Save" : "Add car wash", "btn-primary", async () => {
+      if (!name.value.trim()) { name.focus(); toast("Add the car wash’s name first."); return; }
       saveBtn.disabled = true;
+      const cur = current();
       try {
-        await save("deals", d0 ? d0.id : "", { name: name.value.trim(), account: account.value.trim(), type: type.value, stage: d.stage,
-          value: value.value === "" ? "" : Number(value.value), probability: prob.value === "" ? "" : Number(prob.value), closeDate: close.value, owner: owner.value,
-          contact: contact.value.trim(), contactInfo: contactInfo.value.trim(), source: source.value.trim(), nextStep: nextStep.value.trim(), nextDate: nextDate.value, notes: notes.value },
-          d0 ? "Opportunity saved" : "Opportunity added");
+        await save("deals", d0 ? d0.id : "", Object.assign({ name: name.value.trim(), area: area.value.trim(), type: type.value, stage: d.stage,
+          probability: prob.value === "" ? "" : Number(prob.value), closeDate: close.value, owner: owner.value,
+          contact: contact.value.trim(), contactInfo: contactInfo.value.trim(), source: source.value.trim(), nextStep: nextStep.value.trim(), nextDate: nextDate.value, notes: notes.value,
+          value: Math.round(estimate(cur).monthly) }, cur), d0 ? "Saved" : name.value.trim() + " added");
         dlg.close();
       } catch (e) {} finally { saveBtn.disabled = false; }
     });
-    openDialog({ title: d0 ? d0.name : "New opportunity", wide: true, body, footer: [
-      d0 ? btn("Delete", "btn-danger", async () => { if (confirm("Delete “" + d0.name + "”? This can’t be undone.")) { dlg.close(); await removeRec("deals", d0.id, "Opportunity deleted"); } }) : null,
+    openDialog({ title: d0 ? d0.name : "Add a car wash", wide: true, body, footer: [
+      d0 ? btn("Delete", "btn-danger", async () => { if (confirm("Delete “" + d0.name + "”? This can’t be undone.")) { dlg.close(); await removeRec("deals", d0.id, "Deleted"); } }) : null,
       el("span", { class: "grow" }), btn("Cancel", "btn-ghost", () => dlg.close()), saveBtn] });
-    dialogRefresh = () => { const cur = deals().find(x => x.id === id); if (id && !cur) { dlg.close(); toast("This opportunity was deleted."); } else if (cur && log) log.refresh(cur); };
+    dialogRefresh = () => { const cur = deals().find(x => x.id === id); if (id && !cur) { dlg.close(); toast("This car wash was deleted."); } else if (cur && log) log.refresh(cur); };
     if (!d0) setTimeout(() => name.focus(), 30);
+  }
+
+  /* ---------- revenue model settings ---------- */
+  function modelSettingsCard() {
+    const a = model();
+    const v = Object.assign({}, a);
+    const f = (key, label, hint, attrs) => { const i = inp("number", v[key], Object.assign({ min: "0", step: "any" }, attrs || {})); i.addEventListener("input", () => { v[key] = i.value; preview(); }); return fld(label, i, { hint }); };
+    const method = sel([["provision", "Provision: % of booking-fee revenue (plan)"], ["daily", "Fixed cost per daily payout"]], v.settleMethod);
+    method.addEventListener("change", () => { v.settleMethod = method.value; preview(); });
+    const pv = el("div", { class: "muted", style: "font-size:13.5px" });
+    function preview() {
+      const tmp = Object.assign({}, MODEL_DEFAULTS); Object.keys(v).forEach(k => { tmp[k] = k === "settleMethod" ? v[k] : numOr(v[k], MODEL_DEFAULTS[k]); });
+      const e = estimate({}, tmp);
+      pv.textContent = "With these settings a typical car wash (" + money(tmp.avgPrice) + " wash, " + tmp.bookingsPerDay + " bookings a day) brings in " + money2(e.netPer) + " per booking and " + perMonth(e.monthly) + ".";
+    }
+    preview();
+    const saveB = btn("Save model", "btn-primary", async () => {
+      const value = {}; Object.keys(MODEL_DEFAULTS).forEach(k => { value[k] = k === "settleMethod" ? v[k] : numOr(v[k], MODEL_DEFAULTS[k]); });
+      saveB.disabled = true;
+      try { await save("settings", "model", { value }, "Revenue model saved"); } catch (e) {} finally { saveB.disabled = false; }
+    });
+    return card("Revenue model", null, el("div", {},
+      el("p", { class: "muted", style: "margin:0 0 12px;font-size:13.5px", text: "Used for every car wash estimate. Defaults come from the business plan (sections 7 and 8)." }),
+      el("div", { class: "dlg-b", style: "padding:0" },
+        f("feeFlat", "Booking fee below the threshold (R)", "Plan: R15"), f("feePct", "Booking fee at or above the threshold (%)", "Plan: 15%"),
+        f("feeThreshold", "Threshold wash price (R)", "Plan: R100"), f("subscription", "Monthly subscription (R)", "Plan: R500"),
+        f("freeMonths", "Free subscription months", "Plan: first month free"), f("monthlyCosts", "Monthly costs to cover (R)", "Plan Year 1 average: R71,575"),
+        f("payfastPct", "PayFast fee (%)", "3.2% + R2.00 + VAT matches the plan’s R6.53"), f("payfastFixed", "PayFast fixed fee (R)"),
+        f("vatPct", "VAT on PayFast fees (%)"), fld("Merchant settlement", method),
+        f("settlePct", "Settlement provision (% of booking fees)", "Plan: 15%"), f("settleDaily", "Cost per daily payout (R)", "Plan: R10"),
+        f("bookingsPerDay", "Default bookings per day", "Plan: 5"), f("avgPrice", "Default wash price (R)", "Plan: R100"),
+        f("operatingDays", "Operating days per month", "Plan: 30")),
+      el("div", { style: "margin-top:12px" }, pv),
+      el("div", { style: "display:flex;gap:10px;margin-top:14px;flex-wrap:wrap" }, saveB,
+        btn("Reset to business plan", "btn-ghost", async () => { if (confirm("Reset all revenue model settings to the business plan values?")) { try { await save("settings", "model", { value: MODEL_DEFAULTS }, "Reset to the business plan"); } catch (e) {} } }))));
   }
 
   /* ================= TEAM ================= */
@@ -1517,7 +1714,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
 
   /* ================= SETTINGS ================= */
   function viewSettings(page) {
-    page.append(pageHead("Settings", "Workstreams and this device"));
+    page.append(pageHead("Settings", "Workstreams, the revenue model and this device"));
     const ws = wsList();
     const rows = ws.map(w => {
       const n = tasks().filter(t => (t.workstream || "Other") === w.name).length;
@@ -1539,9 +1736,10 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
           fld("Who’s using this device?", me, { hint: "Used for greetings and as the default name on updates and new meetings." }),
           el("div", {}, btn("Forget passcode on this device", "btn-ghost btn-sm", () => { lsSet("noq.code", ""); location.reload(); })))),
         card("About your data", null, el("div", { class: "muted", style: "font-size:14px;display:flex;flex-direction:column;gap:8px" },
-          el("span", { text: "Everything is saved in the team’s Google Sheet, one tab each for Tasks, Meetings, Pipeline, Team and Workstreams." }),
+          el("span", { text: "Everything is saved in the team’s Google Sheet, one tab each for Tasks, Meetings, Pipeline (business activation), Team, Workstreams and Settings." }),
           el("span", { text: "Meeting files are kept in a “No Q Tracker Files” folder in the sheet owner’s Google Drive and are only shown to people with the passcode." }),
           el("span", { text: lastSync ? "Last synced at " + hhmm(lastSync) + ". Changes from other devices appear within about 20 seconds." : "" }))))));
+    page.append(modelSettingsCard());
   }
   function openWorkstream(w) {
     const name = inp("text", w ? w.name : "", { placeholder: "e.g. Partnerships" });
@@ -1580,6 +1778,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbz3u5caj7ATFCPdhXJZ6H0I
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && !busy()) refresh(); });
   setInterval(() => { if (state.loaded && !busy() && state.route === "home") render(); }, 60000);
 })();
+
 
 </script>
 </body>
